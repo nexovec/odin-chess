@@ -7,9 +7,11 @@ import "core:os"
 import "core:strings"
 import "core:c/libc"
 import "core:mem"
-import "core:unicode"
+// import "core:unicode"
 import "core:bufio"
 import "core:unicode/utf8"
+import "core:time"
+import "core:strconv"
 
 read_entire_file_from_handle :: proc(
 	fd: os.Handle,
@@ -85,26 +87,38 @@ ChessGame :: struct{
 	[]ChessMove
 }
 
-load_file_sequential::proc(contents_bytes:[]u8){
+load_file_sequential::proc(fullpath:string){
+	start_time:=time.now()
+	contents_bytes, success := read_entire_file_from_filename(fullpath)
+	{
+		buf:=make([]u8, 256)
+		defer delete(buf)
+		end_time:=time.since(start_time)
+		fmt.println("Loading the file into RAM took: ", strconv.itoa(buf, int(i64((end_time)))))
+	}
+	if success {
+	} else {
+		fmt.println(args = {"Couldn't read file", fullpath}, sep = "\t")
+	}
 	i: u64 = 0
 	empty_lines: u64 = 0
 	char_count: u64 = 0
 	arena:mem.Arena
-	bytes :[]u8 = make([]u8, 1000000000)
+	bytes :[]u8 = make([]u8, os.file_size_from_path(fullpath))
 	defer delete(bytes)
 	mem.arena_init(&arena,bytes)
 	context.temp_allocator = mem.arena_allocator(&arena)
 	contents :string= transmute(string)contents_bytes
 	iterable_string:=contents
 	// TODO: replace BOM if there is any
-	maybe_bom, len := utf8.decode_rune_in_string(iterable_string)
+	maybe_bom, _ := utf8.decode_rune_in_string(iterable_string)
 	fmt.printf("prefix: \\u%04x\n", maybe_bom)
 	for line in strings.split_lines_iterator(&iterable_string) {
 		// parsing the file
 		if line == "" {
 			empty_lines += 1
 		}
-		for c in line{
+		for _ in line{
 			char_count+=1
 		}
 		i += 1
@@ -112,6 +126,10 @@ load_file_sequential::proc(contents_bytes:[]u8){
 	fmt.println(args = {"characters in file: ", char_count})
 	fmt.println(args = {"lines in file: ", i})
 	fmt.println(args = {"empty lines in file: ", empty_lines})
+	buf:=make([]u8, 256)
+	defer delete(buf)
+	end_time:=time.since(start_time)
+	fmt.println("Sequential scan took: ", strconv.itoa(buf, int(i64((end_time)))))
 }
 
 read_line :: proc(r: ^bufio.Reader) -> (line: string, ok: bool) {
@@ -127,6 +145,7 @@ read_line :: proc(r: ^bufio.Reader) -> (line: string, ok: bool) {
 }
 
 load_file_streamed :: proc(filepath: string){
+	start_time := time.now()
 	char_count :u64 = 0
 	empty_lines:u64 = 0
 	lines:u64 = 0
@@ -138,7 +157,7 @@ load_file_streamed :: proc(filepath: string){
 	stream:= os.stream_from_handle(handle)
 	unbuffered_reader:=io.to_reader(stream)
 	buffered_reader:bufio.Reader
-	READER_BUFFER_SIZE := 2<<24
+	READER_BUFFER_SIZE := 2<<15
 	bufio.reader_init(b = &buffered_reader, rd = unbuffered_reader, size = READER_BUFFER_SIZE)
 
 	ok: bool = true
@@ -150,7 +169,7 @@ load_file_streamed :: proc(filepath: string){
 			empty_lines+=1
 			continue
 		}
-		for c in line{
+		for _ in line{
 			char_count+=1
 		}
 	}
@@ -158,18 +177,26 @@ load_file_streamed :: proc(filepath: string){
 	fmt.println(args = {"characters in file: ", char_count})
 	fmt.println(args = {"lines in file: ", lines})
 	fmt.println(args = {"empty lines in file: ", empty_lines})
-
+	end_time := time.since(start_time)
+	buf := make([]u8, 256)
+	defer delete(buf)
+	fmt.println("Streamed scan took: ", strconv.itoa(buf, int(i64((end_time)))))
 }
 
 main :: proc() {
 	fmt.println("Hello people.")
-	reader: io.Reader = {}
 	wd_path := os.get_current_directory()
-	path_chunks := []string{wd_path, "data"}
+	path_chunks := []string{wd_path, "data", "ignored"}
 	data_dir_path := strings.join(path_chunks, "\\")
 	dir, err_dir_opening := os.open(data_dir_path)
+	if err_dir_opening!=0{
+		panic(strings.concatenate(a={"Error opening directory: ", data_dir_path}))
+	}
 	// Q: How to supply type annotations to the following line?
 	files, err_files_listing := os.read_dir(dir, 0)
+	if err_files_listing!=0{
+		panic(strings.concatenate(a={"Error reading directory: ", data_dir_path}))
+	}
 	for file in files {
 		fmt.println(file)
 		name_splits := strings.split(file.name, ".")
@@ -180,12 +207,7 @@ main :: proc() {
 		if extension == "pgn" {
 			fmt.println("Found file full of chess games!")
 			// FIXME: produces an invalid handle for large files(observed with 9GB pgns)
-			contents_bytes, success := read_entire_file_from_filename(file.fullpath)
-			if success {
-				load_file_sequential(contents_bytes)
-			} else {
-				fmt.println(args = {"Couldn't read file", file.name}, sep = "\t")
-			}
+			load_file_sequential(file.fullpath)
 		} else {
 			fmt.println(file.name, "is not a chess database file")
 		}
