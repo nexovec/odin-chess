@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../../Programs/odin/core"
+		},
+		{
+			"path": "../../Programs/odin/examples"
+		},
+		{
+			"path": "../../Programs/odin/vendor"
+		}
+	],
+	"settings": {}
+}

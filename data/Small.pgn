@@ -1,0 +1,427 @@
+﻿[Event "Valencia Casual Games"]
+[Site "Valencia"]
+[Date "1475.??.??"]
+[Round "?"]
+[White "De Castellvi, Francisco"]
+[Black "Vinoles, Narcisco"]
+[Result "1-0"]
+[ECO "B01"]
+[PlyCount "41"]
+[EventDate "1475.??.??"]
+[EventType "game"]
+[EventCountry "ESP"]
+[SourceTitle "EXT 2008"]
+[Source "ChessBase"]
+[SourceDate "2007.11.25"]
+[SourceVersion "1"]
+[SourceVersionDate "2007.11.25"]
+[SourceQuality "1"]
+
+1. e4 d5 2. exd5 Qxd5 3. Nc3 Qd8 4. Bc4 Nf6 5. Nf3 Bg4 6. h3 Bxf3 7. Qxf3 e6 8.
+Qxb7 Nbd7 9. Nb5 Rc8 10. Nxa7 Nb6 11. Nxc8 Nxc8 12. d4 Nd6 13. Bb5+ Nxb5 14.
+Qxb5+ Nd7 15. d5 exd5 16. Be3 Bd6 17. Rd1 Qf6 18. Rxd5 Qg6 19. Bf4 Bxf4 20.
+Qxd7+ Kf8 21. Qd8# 1-0
+
+[Event "Lucena"]
+[Site "Huesca"]
+[Date "1515.??.??"]
+[Round "?"]
+[White "Lucena, Luis Ramirez"]
+[Black "Quintana"]
+[Result "1-0"]
+[ECO "A00"]
+[PlyCount "63"]
+[EventDate "1515.??.??"]
+[EventType "game"]
+[EventCountry "ESP"]
+[SourceTitle "EXT 2007"]
+[Source "ChessBase"]
+[SourceDate "2006.11.23"]
+[SourceVersion "1"]
+[SourceVersionDate "2006.11.23"]
+[SourceQuality "1"]
+
+1. c3 Nc6 2. d4 e6 3. e4 d5 4. exd5 exd5 5. g3 Bd6 6. Bh3 Bxh3 7. Nxh3 Qd7 8.
+Nf4 Nf6 9. Qf3 Bxf4 10. Bxf4 O-O-O 11. O-O Qh3 12. Bg5 Ng4 13. Qg2 Qxg2+ 14.
+Kxg2 f6 15. Bd2 Rhe8 16. Re1 Rxe1 17. Bxe1 Re8 18. Nd2 Nh6 19. Nf1 Nf5 20. Bd2
+Nd6 21. h4 Ne4 22. Be3 g5 23. hxg5 fxg5 24. f3 Nd6 25. Bxg5 Re2+ 26. Kh3 Rxb2
+27. Ne3 Nb5 28. Nxd5 Rc2 29. Re1 Nxc3 30. Re8+ Kd7 31. Nf6+ Kd6 32. Bf4+ 1-0
+
+[Event "Ruy Lopez"]
+[Site "Rome"]
+[Date "1560.??.??"]
+[Round "?"]
+[White "Lopez de Segura, Ruy"]
+[Black "Leonardo, Giovanni da Cutri"]
+[Result "1-0"]
+[ECO "C30"]
+[PlyCount "23"]
+[EventDate "1560.??.??"]
+[EventType "game"]
+[EventCountry "ITA"]
+[SourceTitle "EXT 1999"]
+[Source "ChessBase"]
+[SourceDate "1998.11.16"]
+[SourceVersion "1"]
+[SourceVersionDate "1998.11.16"]
+[SourceQuality "1"]
+
+1. e4 e5 2. f4 d6 3. Bc4 c6 4. Nf3 Bg4 5. fxe5 dxe5 6. Bxf7+ Kxf7 7. Nxe5+ Ke8
+8. Qxg4 Nf6 9. Qe6+ Qe7 10. Qc8+ Qd8 11. Qxd8+ Kxd8 12. Nf7+ 1-0
+
+[Event "Ruy Lopez"]
+[Site "Rome"]
+[Date "1572.??.??"]
+[Round "?"]
+[White "Lopez de Segura, Ruy"]
+[Black "Leonardo, Giovanni da Cutri"]
+[Result "1-0"]
+[ECO "C40"]
+[PlyCount "18"]
+[EventDate "1572.??.??"]
+[EventType "game"]
+[EventCountry "ITA"]
+[SourceTitle "EXT 2007"]
+[Source "ChessBase"]
+[SourceDate "2006.11.23"]
+[SourceVersion "1"]
+[SourceVersionDate "2006.11.23"]
+[SourceQuality "1"]
+
+1. e4 e5 2. Nf3 f6 3. Nxe5 fxe5 4. Qh5+ g6 5. Qxe5+ Qe7 6. Qxh8 Nf6 7. d4 Kf7
+8. Bc4+ d5 9. Bxd5+ Nxd5 1-0
+
+[Event "Ruy Lopez"]
+[Site "Rome"]
+[Date "1572.??.??"]
+[Round "?"]
+[White "Polerio, Giulio Cesare"]
+[Black "Leonardo, Giovanni da Cutri"]
+[Result "0-1"]
+[ECO "C40"]
+[PlyCount "26"]
+[EventDate "1572.??.??"]
+[EventType "game"]
+[EventCountry "ITA"]
+[SourceTitle "EXT 2007"]
+[Source "ChessBase"]
+[SourceDate "2006.11.23"]
+[SourceVersion "1"]
+[SourceVersionDate "2006.11.23"]
+[SourceQuality "1"]
+
+1. e4 e5 2. Nf3 f5 3. Nxe5 Qe7 4. Qh5+ g6 5. Nxg6 Qxe4+ 6. Kd1 Nf6 7. Qh4 Ng4
+8. d3 hxg6 9. Qxh8 Nxf2+ 10. Kd2 Qg4 11. Qe5+ Kf7 12. Be2 Qg5+ 13. Kc3 Qh4 0-1
+
+[Event "ESP Casual Games"]
+[Site "Spain"]
+[Date "1575.??.??"]
+[Round "?"]
+[White "Scovara"]
+[Black "Boi, Paolo"]
+[Result "0-1"]
+[ECO "C53"]
+[PlyCount "27"]
+[EventDate "1575.??.??"]
+[EventType "game"]
+[EventCountry "ESP"]
+[SourceTitle "EXT 2007"]
+[Source "ChessBase"]
+[SourceDate "2006.11.23"]
+[SourceVersion "1"]
+[SourceVersionDate "2006.11.23"]
+[SourceQuality "1"]
+
+1. e4 e5 2. Bc4 Bc5 3. Nf3 Nc6 4. c3 Qe7 5. d4 exd4 6. cxd4 Qxe4+ 7. Be3 Bb4+
+8. Nc3 d5 9. Bd3 Qe7 10. h3 Nf6 11. Kf1 Kf8 12. g4 Kg8 13. Rh2 Bd6 14. Rg2 0-1
+
+[Event "Ruy Lopez"]
+[Site "Madrid"]
+[Date "1575.??.??"]
+[Round "1"]
+[White "Leonardo, Giovanni da Cutri"]
+[Black "Lopez de Segura, Ruy"]
+[Result "1-0"]
+[ECO "C41"]
+[PlyCount "19"]
+[EventDate "1575.??.??"]
+[EventType "game"]
+[EventCountry "ESP"]
+[SourceTitle "EXT 2007"]
+[Source "ChessBase"]
+[SourceDate "2006.11.23"]
+[SourceVersion "1"]
+[SourceVersionDate "2006.11.23"]
+[SourceQuality "1"]
+
+1. e4 e5 2. Nf3 d6 3. Bc4 f5 4. d3 Be7 5. Qe2 c6 6. h3 f4 7. g3 fxg3 8. fxg3
+Qc7 9. Nc3 Nf6 10. b4 1-0
+
+[Event "Ruy Lopez"]
+[Site "Madrid"]
+[Date "1575.??.??"]
+[Round "2"]
+[White "Leonardo, Giovanni da Cutri"]
+[Black "Lopez de Segura, Ruy"]
+[Result "1-0"]
+[ECO "C53"]
+[PlyCount "19"]
+[EventDate "1575.??.??"]
+[EventType "game"]
+[EventCountry "ESP"]
+[SourceTitle "EXT 2007"]
+[Source "ChessBase"]
+[SourceDate "2006.11.23"]
+[SourceVersion "1"]
+[SourceVersionDate "2006.11.23"]
+[SourceQuality "1"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. c3 Qe7 5. b4 Bb6 6. a4 a6 7. Ba3 d6 8. d3 Nf6
+9. Qe2 Bg4 10. Nbd2 1-0
+
+[Event "Polerio"]
+[Site "Rome"]
+[Date "1590.??.??"]
+[Round "?"]
+[White "Polerio, Giulio Cesare"]
+[Black "Busnardo"]
+[Result "1-0"]
+[ECO "C33"]
+[PlyCount "21"]
+[EventDate "1590.??.??"]
+[EventType "game"]
+[EventCountry "ITA"]
+[SourceTitle "EXT 2007"]
+[Source "ChessBase"]
+[SourceDate "2006.11.23"]
+[SourceVersion "1"]
+[SourceVersionDate "2006.11.23"]
+[SourceQuality "1"]
+
+1. e4 e5 2. f4 exf4 3. Bc4 Qh4+ 4. Kf1 g5 5. Nf3 Qh5 6. d4 d6 7. h4 g4 8. Ng5
+Nh6 9. Bxf4 f6 10. Ne6 Bxe6 11. Bxe6 1-0
+
+[Event "Polerio"]
+[Site "Rome"]
+[Date "1590.??.??"]
+[Round "?"]
+[White "Saduleto, Giovanni"]
+[Black "Polerio, Giulio Cesare"]
+[Result "*"]
+[ECO "C53"]
+[PlyCount "25"]
+[EventDate "1590.??.??"]
+[EventType "game"]
+[EventCountry "ITA"]
+[SourceTitle "EXT 2007"]
+[Source "ChessBase"]
+[SourceDate "2006.11.23"]
+[SourceVersion "1"]
+[SourceVersionDate "2006.11.23"]
+[SourceQuality "1"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. c3 Qe7 5. O-O d6 6. d4 Bb6 7. h3 h6 8. Be3
+Nf6 9. Nbd2 O-O 10. Re1 Na5 11. Bd3 a6 12. Nf1 Ba7 13. Ng3 *
+
+[Event "Polerio"]
+[Site "Rome"]
+[Date "1590.??.??"]
+[Round "?"]
+[White "Saduleto, Giovanni"]
+[Black "Polerio, Giulio Cesare"]
+[Result "0-1"]
+[ECO "C53"]
+[PlyCount "48"]
+[EventDate "1590.??.??"]
+[EventType "game"]
+[EventCountry "ITA"]
+[SourceTitle "EXT 2007"]
+[Source "ChessBase"]
+[SourceDate "2006.11.23"]
+[SourceVersion "1"]
+[SourceVersionDate "2006.11.23"]
+[SourceQuality "1"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. c3 Qe7 5. O-O d6 6. d4 Bb6 7. Bg5 Nf6 8. d5
+Nb8 9. Nbd2 Bg4 10. Qc2 h6 11. Bh4 g5 12. Bg3 a6 13. b4 Nbd7 14. a4 Nf8 15. a5
+Ba7 16. b5 Ng6 17. bxa6 bxa6 18. Bxa6 Bxf2+ 19. Rxf2 Rxa6 20. Qd3 Ra8 21. Qb5+
+Kf8 22. Qb7 Kg7 23. a6 Rhb8 24. Qc6 Ra7 0-1
+
+[Event "Polerio"]
+[Site "Rome"]
+[Date "1610.??.??"]
+[Round "?"]
+[White "Polerio, Giulio Cesare"]
+[Black "D'Arminio, Domenico"]
+[Result "1-0"]
+[ECO "C57"]
+[Annotator "Kahn,V"]
+[PlyCount "47"]
+[EventDate "1610.??.??"]
+[EventType "game"]
+[EventCountry "ITA"]
+[SourceTitle "EXT 1999"]
+[Source "ChessBase"]
+[SourceDate "1998.11.16"]
+[SourceVersion "1"]
+[SourceVersionDate "1998.11.16"]
+[SourceQuality "1"]
+
+1. e4 {La plus ancienne partie connue après la réforme du jeu des échecs date
+de 1485. jouée entre Francisco De CALTEVI et Narcisco VIGNOLES, cette partie
+qu'on trouve dans "the golden Treasury of chess", New-York de F.J WELLMUTH est
+assez faible. Rien d'étonnant, les échecs modernes venaient seulement de
+naître. Mais le même ouvrage contient une partie que le génial POLERIO joua en
+1580. Nous y voyons au 06ème coup, ce sacrifice qu'EUWE, entre autres
+commentateurs attribua à GRECO.  Le "Fegatello" aurait donc été pratiqué 20
+ans avant sa naissance présumée.} e5 2. Nf3 Nc6 3. Bc4 Nf6 4. Ng5 d5 5. exd5
+Nxd5 {Nous ne mettons pas de point d'interrogation usuel à ce coup car les
+analyses n'en donnent pas de réfutation pratique. Si on ne voit guère ce coup
+en pratique, c'est pour des raisons psychologiques. Les noirs craignent le
+désagréable exode du N} 6. Nxf7 $1 {Ce point d'exclamation ne signifie pas non
+plus que le sacrifice est la continuation la plus forte des blancs mais nous
+tenons à saluer le génie de POLERIO, inventeur du Fegatello.} (6. d4 {Les
+analyses récentes préfèrent 6.d4}) 6... Kxf7 7. Qf3+ Ke6 8. Nc3 Nce7 (8... Ncb4
+{Déjà STEINITZ avait renforcé avec Nb4} 9. Qe4 (9. a3 Nxc2+ 10. Kd1 Nd4 11.
+Bxd5+ Kd6 $11) 9... c6 10. a3 Na6 11. d4 Nac7 $1 12. Bf4 (12. Qxe5+ Kf7) 12...
+Kf7 13. Bxe5 {Et comme dit EUWE, il faut encore prouver que l'attaque blanche
+vaut la pièce sacrifiée}) 9. d4 $1 c6 10. Bg5 h6 11. Bxe7 Bxe7 12. O-O-O Rf8
+13. Qe4 Rxf2 14. dxe5 Bg5+ 15. Kb1 Rd2 16. h4 $1 Rxd1+ 17. Rxd1 Bxh4 18. Nxd5
+cxd5 19. Rxd5 Qg5 20. Rd6+ Ke7 21. Rg6 $1 Qd2 22. Rxg7+ Kf8 23. Rg8+ Ke7 24.
+Qh7# 1-0
+
+[Event "Greco"]
+[Site "Europe"]
+[Date "1620.??.??"]
+[Round "?"]
+[White "Greco, Gioacchino"]
+[Black "NN"]
+[Result "1-0"]
+[ECO "C53"]
+[PlyCount "27"]
+[EventDate "1620.??.??"]
+[EventType "game"]
+[EventCountry "ITA"]
+[SourceTitle "EXT 2001"]
+[Source "ChessBase"]
+[SourceDate "2000.11.22"]
+[SourceVersion "1"]
+[SourceVersionDate "2000.11.22"]
+[SourceQuality "1"]
+
+1. e4 e5 2. Nf3 Nc6 3. Bc4 Bc5 4. c3 Qe7 5. O-O d6 6. d4 Bb6 7. Bg5 f6 8. Bh4
+g5 9. Nxg5 fxg5 10. Qh5+ Kf8 11. Bxg5 Qe8 12. Qf3+ Kg7 13. Bxg8 Rxg8 14. Qf6#
+1-0
+
+[Event "Greco"]
+[Site "Europe"]
+[Date "1620.??.??"]
+[Round "?"]
+[White "Greco, Gioacchino"]
+[Black "NN"]
+[Result "1-0"]
+[ECO "C40"]
+[PlyCount "13"]
+[EventDate "1620.??.??"]
+[EventType "game"]
+[EventCountry "ITA"]
+[SourceTitle "EXT 2001"]
+[Source "ChessBase"]
+[SourceDate "2000.11.22"]
+[SourceVersion "1"]
+[SourceVersionDate "2000.11.22"]
+[SourceQuality "1"]
+
+1. e4 e5 2. Nf3 Qf6 3. Bc4 Qg6 4. O-O Qxe4 5. Bxf7+ Kxf7 6. Ng5+ Ke8 7. Nxe4
+1-0
+
+[Event "Greco"]
+[Site "Europe"]
+[Date "1620.??.??"]
+[Round "?"]
+[White "Greco, Gioacchino"]
+[Black "NN"]
+[Result "1-0"]
+[ECO "C41"]
+[PlyCount "9"]
+[EventDate "1620.??.??"]
+[EventType "game"]
+[EventCountry "ITA"]
+[SourceTitle "EXT 2001"]
+[Source "ChessBase"]
+[SourceDate "2000.11.22"]
+[SourceVersion "1"]
+[SourceVersionDate "2000.11.22"]
+[SourceQuality "1"]
+
+1. e4 e5 2. Nf3 d6 3. h3 Nf6 4. c3 Nxe4 5. Qa4+ 1-0
+
+[Event "Greco"]
+[Site "Europe"]
+[Date "1620.??.??"]
+[Round "?"]
+[White "Greco, Gioacchino"]
+[Black "NN"]
+[Result "1-0"]
+[ECO "C23"]
+[PlyCount "29"]
+[EventDate "1620.??.??"]
+[EventType "game"]
+[EventCountry "ITA"]
+[SourceTitle "EXT 2001"]
+[Source "ChessBase"]
+[SourceDate "2000.11.22"]
+[SourceVersion "1"]
+[SourceVersionDate "2000.11.22"]
+[SourceQuality "1"]
+
+1. e4 e5 2. Bc4 Bc5 3. Qe2 Qe7 4. f4 exf4 5. Nf3 Nf6 6. d4 Bb4+ 7. c3 Ba5 8. e5
+Nh5 9. O-O O-O 10. Ne1 Qh4 11. Nd3 g5 12. Nd2 c6 13. Ne4 Kh8 14. Nd6 Na6 15.
+Nf5 1-0
+
+[Event "Greco"]
+[Site "Europe"]
+[Date "1620.??.??"]
+[Round "?"]
+[White "Greco, Gioacchino"]
+[Black "NN"]
+[Result "1-0"]
+[ECO "D20"]
+[PlyCount "45"]
+[EventDate "1620.??.??"]
+[EventType "game"]
+[EventCountry "ITA"]
+[SourceTitle "EXT 2001"]
+[Source "ChessBase"]
+[SourceDate "2000.11.22"]
+[SourceVersion "1"]
+[SourceVersionDate "2000.11.22"]
+[SourceQuality "1"]
+
+1. d4 d5 2. c4 dxc4 3. e4 b5 4. a4 c6 5. axb5 cxb5 6. b3 a5 7. bxc4 b4 8. d5 e6
+9. Nd2 exd5 10. exd5 Bc5 11. Nb3 Bb6 12. c5 Qe7+ 13. Qe2 Qxe2+ 14. Bxe2 Bd8 15.
+Bb5+ Kf8 16. c6 Bb6 17. Be3 Bxe3 18. fxe3 Nf6 19. d6 g6 20. d7 Bxd7 21. cxd7
+Nbxd7 22. Bxd7 Nxd7 23. Rxa5 1-0
+
+[Event "Greco"]
+[Site "Europe"]
+[Date "1620.??.??"]
+[Round "?"]
+[White "Greco, Gioacchino"]
+[Black "NN"]
+[Result "1-0"]
+[ECO "C33"]
+[PlyCount "25"]
+[EventDate "1620.??.??"]
+[EventType "game"]
+[EventCountry "ITA"]
+[SourceTitle "EXT 2001"]
+[Source "ChessBase"]
+[SourceDate "2000.11.22"]
+[SourceVersion "1"]
+[SourceVersionDate "2000.11.22"]
+[SourceQuality "1"]
+
+1. e4 e5 2. f4 exf4 3. Bc4 Qh4+ 4. Kf1 d6 5. Nf3 Bg4 6. d4 Qf6 7. e5 Qh6 8. g3
+Qh3+ 9. Kf2 fxg3+ 10. hxg3 Bxf3 11. Qxf3 Qd7 12. Qxb7 Qc6 13. Bb5 1-0
+
