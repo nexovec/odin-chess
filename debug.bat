@@ -1,0 +1,1 @@
+odin run src -vet -warnings-as-errors -debug -o:minimal -show-timings -microarch:native -thread-count:6

@@ -3,6 +3,10 @@
         {
             "name": "core",
             "path": "D:\\Programs\\odin\\core"
+        },
+        {
+            "name": "vendor",
+            "path": "D:\\Programs\\odin\\vendor"
         }
     ],
     "enable_document_symbols": true,

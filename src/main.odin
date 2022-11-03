@@ -83,9 +83,6 @@ read_entire_file_from_filename :: proc(
 }
 
 ChessMove::distinct u8
-ChessGame :: struct{
-	[]ChessMove
-}
 
 load_file_sequential::proc(fullpath:string){
 	start_time:=time.now()
@@ -183,7 +180,7 @@ load_file_streamed :: proc(filepath: string){
 	fmt.println("Streamed scan took: ", strconv.itoa(buf, int(i64((end_time)))))
 }
 
-main :: proc() {
+main2 :: proc() {
 	fmt.println("Hello people.")
 	wd_path := os.get_current_directory()
 	path_chunks := []string{wd_path, "data", "ignored"}
