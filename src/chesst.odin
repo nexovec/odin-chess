@@ -4,9 +4,10 @@ import "core:fmt"
 // import "core:c/libc"
 import SDL "vendor:sdl2"
 import mu "vendor:microui"
+import SDL_Image "vendor:sdl2/image"
 // import gl "vendor:OpenGL"
-// import stb_image "vendor:stb/image"
 state := struct {
+	// import stb_image "vendor:stb/image"
 	mu_ctx:          mu.Context,
 	log_buf:         [1 << 16]byte,
 	log_buf_len:     int,
@@ -16,6 +17,9 @@ state := struct {
 } {
 	bg = {90, 95, 100, 255},
 }
+
+cb_image: ^SDL.Surface
+cb_texture: ^SDL.Texture
 
 main :: proc() {
 	if err := SDL.Init({.VIDEO}); err != 0 {
@@ -90,6 +94,17 @@ main :: proc() {
 		fmt.eprintln("SDL.UpdateTexture:", err)
 		return
 	}
+
+	// loading chessboard as image
+	SDL_Image.Init(SDL_Image.INIT_PNG)
+	defer SDL_Image.Quit()
+
+	cb_image = SDL_Image.Load("assets/chessbcg.bmp")
+	assert(cb_image != nil)
+	defer SDL.FreeSurface(cb_image)
+
+	cb_texture = SDL.CreateTextureFromSurface(renderer, cb_image)
+	defer SDL.DestroyTexture(cb_texture)
 
 	ctx := &state.mu_ctx
 	mu.init(ctx)
@@ -208,6 +223,7 @@ render :: proc(ctx: ^mu.Context, renderer: ^SDL.Renderer) {
 			unreachable()
 		}
 	}
+	SDL.RenderCopyEx(renderer, cb_texture, nil, &SDL.Rect{0,0,100,100}, 0, nil, SDL.RendererFlip.NONE)
 
 	SDL.RenderPresent(renderer)
 }
