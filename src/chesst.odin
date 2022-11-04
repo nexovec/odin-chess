@@ -223,7 +223,15 @@ render :: proc(ctx: ^mu.Context, renderer: ^SDL.Renderer) {
 			unreachable()
 		}
 	}
-	SDL.RenderCopyEx(renderer, cb_texture, nil, &SDL.Rect{0,0,100,100}, 0, nil, SDL.RendererFlip.NONE)
+	SDL.RenderCopyEx(
+		renderer,
+		cb_texture,
+		nil,
+		&SDL.Rect{500, 200, 100, 100},
+		0,
+		nil,
+		SDL.RendererFlip.NONE,
+	)
 
 	SDL.RenderPresent(renderer)
 }
@@ -259,6 +267,60 @@ reset_log :: proc() {
 all_windows :: proc(ctx: ^mu.Context) {
 	@(static)
 	opts := mu.Options{.NO_CLOSE}
+	opts_navbar := mu.Options{.NO_CLOSE, .NO_RESIZE, .NO_TITLE}
+
+	if mu.window(ctx, "Menu Bar", {0, 0, 1280, 30}, opts_navbar) {
+		mu.layout_row(ctx, []i32{60, 60, 60}, 0)
+
+		if .SUBMIT in mu.button(ctx, "File") {
+			mu.open_popup(ctx, "popup")
+			fmt.println("click")
+		}
+
+		if mu.begin_popup(ctx, "popup") {
+			mu.label(ctx, "Hello")
+			if .SUBMIT in mu.button(ctx, "New...") {
+				mu.open_popup(ctx, "new_suboptions")
+			}
+			if mu.begin_popup(ctx, "new_suboptions") {
+				// mu.label(ctx, "something nicer")
+				mu.button(ctx, "Game")
+				mu.button(ctx, "Database")
+				mu.end_popup(ctx)
+			}
+			mu.button(ctx, "Import")
+			mu.button(ctx, "Export")
+			mu.button(ctx, "Chesst files")
+			mu.button(ctx, "Quit")
+			mu.end_popup(ctx)
+		}
+
+		if .SUBMIT in mu.button(ctx, "Project") {
+			mu.open_popup(ctx, "view_suboptions")
+		}
+
+		if mu.begin_popup(ctx, "view_suboptions") {
+			mu.button(ctx, "Save as template")
+			mu.button(ctx, "Update template")
+			mu.button(ctx, "Open template")
+			if .SUBMIT in mu.button(ctx, "Recent...") {
+				mu.label(ctx, "last open editors")
+			}
+			mu.end_popup(ctx)
+		}
+
+		if .SUBMIT in mu.button(ctx, "Help") {
+			mu.open_popup(ctx, "help_suboptions")
+		}
+
+		if mu.begin_popup(ctx, "help_suboptions") {
+			mu.button(ctx, "Documentation")
+			mu.button(ctx, "Give feedback")
+			mu.button(ctx, "Preferences")
+			mu.end_popup(ctx)
+		}
+	}
+	// mu.begin_panel(ctx,"A panel")
 
 	if mu.window(ctx, "Demo Window", {40, 40, 300, 450}, opts) {
 		if .ACTIVE in mu.header(ctx, "Window Info") {
