@@ -6,6 +6,11 @@ import "core:fmt"
 import SDL "vendor:sdl2"
 import mu "vendor:microui"
 import SDL_Image "vendor:sdl2/image"
+import os "core:os"
+import io "core:io"
+import bufio "core:bufio"
+import win32 "core:sys/windows"
+import strings "core:strings"
 // import gl "vendor:OpenGL"
 
 TIME_PER_TICK :i32: 1000/60
@@ -286,6 +291,49 @@ reset_log :: proc() {
 	state.log_buf_len = 0
 }
 
+open_file::proc(filepath:string="data/small.pgn"){
+	splits := strings.split(filepath,".")
+	extension:=splits[len(splits)-1]
+	if extension != "pgn"{
+		write_log(fmt.tprint(args={"Extension",extension,"not supported!"}))
+		return
+	}
+
+	handle,err:=os.open(filepath)
+	if err!=os.ERROR_NONE{
+		write_log(fmt.tprint(args={"Couldn't open:", filepath}, sep = " "))
+		when ODIN_OS == .Windows{
+			thing:=win32.GetLastError()
+			write_log(fmt.tprint("error code: ", thing))
+		}
+		return
+	}
+	assert(handle!=os.INVALID_HANDLE)
+	defer os.close(handle)
+	stream:=os.stream_from_handle(handle)
+	raw_reader, ok:=io.to_reader(stream)
+	if ok==false{
+		write_log(fmt.tprint("Couldn't stream file: ", filepath))
+		return
+	}
+	reader:bufio.Reader
+	bufio.reader_init(&reader, raw_reader, 1<<16)
+	defer bufio.reader_destroy(&reader)
+	// FIXME: handle CRLF vs LF
+	// TODO: skip BOM if there is any
+	for {
+		line,ok:=bufio.reader_read_slice(&reader,'\n')
+		if ok!=io.Error.None{
+			break
+		}
+		// contents := transmute(string)line[:len(line)-1]
+		// write_log(contents)
+		contents := transmute(string)line
+		contents_trimmed:= strings.trim(contents, "\r\n")
+		write_log(contents_trimmed)
+	}
+}
+
 
 all_windows :: proc(ctx: ^mu.Context) {
 	@(static)
@@ -313,7 +361,9 @@ all_windows :: proc(ctx: ^mu.Context) {
 				mu.button(ctx, "Database")
 				mu.end_popup(ctx)
 			}
-			mu.button(ctx, "Import")
+			if .SUBMIT in mu.button(ctx, "Import"){
+				open_file()
+			}
 			mu.button(ctx, "Export")
 			mu.button(ctx, "Chesst files")
 			mu.button(ctx, "Quit")
