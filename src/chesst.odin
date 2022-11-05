@@ -1,11 +1,17 @@
 package main
 
 import "core:fmt"
+// import "core:math"
 // import "core:c/libc"
 import SDL "vendor:sdl2"
 import mu "vendor:microui"
 import SDL_Image "vendor:sdl2/image"
 // import gl "vendor:OpenGL"
+
+TIME_PER_TICK :i32: 1000/60
+
+Vec2i :: distinct [2]i32
+
 state := struct {
 	// import stb_image "vendor:stb/image"
 	mu_ctx:          mu.Context,
@@ -14,10 +20,19 @@ state := struct {
 	log_buf_updated: bool,
 	bg:              mu.Color,
 	atlas_texture:   ^SDL.Texture,
+	sdl_wsize: Vec2i
 } {
 	bg = {90, 95, 100, 255},
+	sdl_wsize = Vec2i{960, 540}
 }
 
+MU_PROPERTIES:= struct{
+	STATUS_BAR_HEIGHT:i32,
+	MENU_HEIGHT:i32
+} {
+	STATUS_BAR_HEIGHT=25,
+	MENU_HEIGHT = 30
+}
 cb_image: ^SDL.Surface
 cb_texture: ^SDL.Texture
 
@@ -32,8 +47,8 @@ main :: proc() {
 		"microui-odin",
 		SDL.WINDOWPOS_UNDEFINED,
 		SDL.WINDOWPOS_UNDEFINED,
-		960,
-		540,
+		state.sdl_wsize.x,
+		state.sdl_wsize.y,
 		{.SHOWN, .RESIZABLE},
 	)
 	if window == nil {
@@ -112,6 +127,7 @@ main :: proc() {
 	ctx.text_width = mu.default_atlas_text_width
 	ctx.text_height = mu.default_atlas_text_height
 
+	lastTick:i32=0
 	main_loop: for {
 		for e: SDL.Event; SDL.PollEvent(&e);  /**/{
 			#partial switch e.type {
@@ -162,14 +178,20 @@ main :: proc() {
 				case .BACKSPACE:
 					fn(ctx, .BACKSPACE)
 				}
+			case .WINDOWEVENT:
+				SDL.GetWindowSize(window, &state.sdl_wsize.x, &state.sdl_wsize.y)
 			}
 		}
 
 		mu.begin(ctx)
 		all_windows(ctx)
 		mu.end(ctx)
-
 		render(ctx, renderer)
+
+		for i32(SDL.GetTicks())-lastTick < TIME_PER_TICK{
+			SDL.Delay(1)
+		}
+		lastTick = i32(SDL.GetTicks())
 	}
 }
 
@@ -223,6 +245,7 @@ render :: proc(ctx: ^mu.Context, renderer: ^SDL.Renderer) {
 			unreachable()
 		}
 	}
+
 	SDL.RenderCopyEx(
 		renderer,
 		cb_texture,
@@ -269,7 +292,9 @@ all_windows :: proc(ctx: ^mu.Context) {
 	opts := mu.Options{.NO_CLOSE}
 	opts_navbar := mu.Options{.NO_CLOSE, .NO_RESIZE, .NO_TITLE}
 
-	if mu.window(ctx, "Menu Bar", {0, 0, 1280, 30}, opts_navbar) {
+	if mu.window(ctx, "Menu Bar", {0, 0, state.sdl_wsize.x, MU_PROPERTIES.MENU_HEIGHT}, opts_navbar) {
+		w := mu.get_current_container(ctx)
+		w.rect.w = state.sdl_wsize.x
 		mu.layout_row(ctx, []i32{60, 60, 60}, 0)
 
 		if .SUBMIT in mu.button(ctx, "File") {
@@ -320,7 +345,13 @@ all_windows :: proc(ctx: ^mu.Context) {
 			mu.end_popup(ctx)
 		}
 	}
-	// mu.begin_panel(ctx,"A panel")
+
+	if(mu.window(ctx, "Status bar", mu.Rect{0, state.sdl_wsize.y-MU_PROPERTIES.STATUS_BAR_HEIGHT, 8500, MU_PROPERTIES.STATUS_BAR_HEIGHT}, opts_navbar)){
+		// changes size of status BAR
+		status_bar := mu.get_current_container(ctx)
+		status_bar.rect.y = state.sdl_wsize.y - MU_PROPERTIES.STATUS_BAR_HEIGHT
+		mu.label(ctx, "Status: Idle")
+	}
 
 	if mu.window(ctx, "Demo Window", {40, 40, 300, 450}, opts) {
 		if .ACTIVE in mu.header(ctx, "Window Info") {
