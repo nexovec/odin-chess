@@ -11,6 +11,8 @@ import io "core:io"
 import bufio "core:bufio"
 import win32 "core:sys/windows"
 import strings "core:strings"
+// import mem "core:mem"
+// import runtime "core:runtime"
 // import gl "vendor:OpenGL"
 
 TIME_PER_TICK :i32: 1000/60
@@ -291,6 +293,70 @@ reset_log :: proc() {
 	state.log_buf_len = 0
 }
 
+skip_characters_in_set :: proc(reader:^bufio.Reader, chars:[$T]u8){
+	for{
+		r,s, err := bufio.reader_read_rune(reader)
+		if err!=.None{
+			panic("Error happened!")
+		}
+		if s!=1{
+			panic("unexpected character")
+		}
+		c:=u8(r)
+		switch c{
+			case chars:
+			case:
+				bufio.reader_unread_rune(reader)
+				return
+		}
+	}
+}
+
+parse_metadata_item::proc(reader:^bufio.Reader){
+	// assumes '[' has already been consumed
+	line,e:=bufio.reader_read_slice(reader, '\n')
+	if e!=.None{
+		panic("something went wrong")
+	}
+	key_len:=0
+
+	for char in line{
+		// FIXME: char could be utf-8 and produce weird behavior
+		disallowed_chars:=[?]u8{'[',']','\n','\t','\'', '\r'}
+		termination_characters:=[?]u8{'\"',' '}
+		switch char{
+			case termination_characters:
+				break
+			case disallowed_chars:
+				panic("disallowed characters")
+			case:
+				key_len+=1
+		}
+	}
+	assert(key_len>0)
+	assert(line[key_len+1] == '\"')
+	val_start:=key_len+2
+	val_len:=0
+	for char in line[val_start:]{
+		// FIXME: char could be utf-8 and produce weird behavior
+		disallowed_chars:=[?]u8{'[',']','\n'}
+		termination_characters:=[?]u8{'\"'}
+		switch char{
+			case termination_characters:
+				break
+			case disallowed_chars:
+				panic("disallowed characters")
+			case:
+				val_len+=1
+		}
+	}
+	assert(line[val_start+val_len]=='\"')
+	assert(line[val_start+val_len+1]==']')
+
+	fmt.print("key:",line[:key_len],"\t")
+	fmt.println("value:",line[val_start:val_start+val_len])
+}
+
 open_file::proc(filepath:string="data/small.pgn"){
 	splits := strings.split(filepath,".")
 	extension:=splits[len(splits)-1]
@@ -311,8 +377,8 @@ open_file::proc(filepath:string="data/small.pgn"){
 	assert(handle!=os.INVALID_HANDLE)
 	defer os.close(handle)
 	stream:=os.stream_from_handle(handle)
-	raw_reader, ok:=io.to_reader(stream)
-	if ok==false{
+	raw_reader, ok_reader:=io.to_reader(stream)
+	if ok_reader==false{
 		write_log(fmt.tprint("Couldn't stream file: ", filepath))
 		return
 	}
@@ -320,17 +386,91 @@ open_file::proc(filepath:string="data/small.pgn"){
 	bufio.reader_init(&reader, raw_reader, 1<<16)
 	defer bufio.reader_destroy(&reader)
 	// FIXME: handle CRLF vs LF
-	// TODO: skip BOM if there is any
+	{
+		_,s,err_BOM := bufio.reader_read_rune(&reader)
+		if err_BOM != .None{
+			write_log(fmt.tprint("Error reading the first rune of: ", filepath))
+			return
+		}
+		if s == 1{
+			// no BOM in the file -> reverting to first character
+			bufio.reader_unread_rune(&reader)
+		}
+	}
+	Chess_Square :: distinct byte
+	Chess_Move :: struct{
+		src: Chess_Square,
+		dest: Chess_Square
+	}
+	Metadata_Column :: struct{
+		key:string,
+		values: [dynamic]string
+	}
+	// metadata_table: [dynamic]Metadata_Column = make([dynamic]Metadata_Column,18,32)
+	Parsing_Stage :: enum{
+		None,
+		Metadata,
+		Moves
+	}
+	parsing_stage: Parsing_Stage=.None
+
+	line_count:=1
 	for {
-		line,ok:=bufio.reader_read_slice(&reader,'\n')
-		if ok!=io.Error.None{
+		r,s, err_rune := bufio.reader_read_rune(&reader)
+
+		if err_rune != io.Error.None{
 			break
 		}
+		notation_piece_runes:=[?]u8{'R','N','B','K','Q'}
+		whitespace_runes:=[?]u8{' ', '\n', '\t'}
+		switch parsing_stage{
+			case .None:
+				//skip whitespace
+				skip_characters_in_set(&reader, whitespace_runes)
+				if s!=1{
+					panic(fmt.tprintf("PGN syntax error, unexpected multi-byte character at %s:%d", filepath, line_count))
+				}
+				c := u8(r)
+				//decide if moves or metadata
+
+				// TODO: test without conversion
+				// switch r{
+				switch c{
+					case '[':
+						// bufio.reader_unread_rune(&reader)
+						parsing_stage=.Metadata
+					case 'a'..='h':
+						fallthrough
+					case notation_piece_runes:
+						bufio.reader_unread_rune(&reader)
+						parsing_stage=.Moves
+					case:
+						panic(fmt.tprintf("PGN syntax error at %s:%d", filepath, line_count))
+				}
+			case .Metadata:
+				// '[' was already consumed
+				// reading key
+				fmt.println("parsing metadata:")
+				for{
+					fmt.println("parsing metadata row")
+					parse_metadata_item(&reader)
+					r,s, err := bufio.reader_read_rune(&reader)
+					if s==1 && u8(r)=='\n'{
+						parsing_stage=.Moves
+						break
+					}else if s==1 && u8(r)=='['{
+					}else{
+						panic("unexpected thing in PGN file")
+					}
+				}
+			case .Moves:
+				fmt.println("parsing moves")
+		}
+
 		// contents := transmute(string)line[:len(line)-1]
-		// write_log(contents)
-		contents := transmute(string)line
-		contents_trimmed:= strings.trim(contents, "\r\n")
-		write_log(contents_trimmed)
+		// contents := transmute(string)line
+		// contents_trimmed:= strings.trim(contents, "\r\n")
+		// write_log(contents_trimmed)
 	}
 }
 
