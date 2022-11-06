@@ -1,1 +1,1 @@
-odin run src -vet -warnings-as-errors -debug -o:minimal -show-timings -microarch:native -thread-count:6 -pdb-name:build/chesst.pdb -out:build/chesst.exe -strict-style-init-only
+odin run src -debug -o:minimal -show-timings -microarch:native -thread-count:6 -pdb-name:build/chesst.pdb -out:build/chesst.exe -strict-style-init-only

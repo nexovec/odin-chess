@@ -294,7 +294,7 @@ reset_log :: proc() {
 }
 
 skip_characters_in_set :: proc(reader:^bufio.Reader, chars:[$T]u8){
-	for{
+	skipping: for{
 		r,s, err := bufio.reader_read_rune(reader)
 		if err!=.None{
 			panic("Error happened!")
@@ -303,32 +303,30 @@ skip_characters_in_set :: proc(reader:^bufio.Reader, chars:[$T]u8){
 			panic("unexpected character")
 		}
 		c:=u8(r)
-		switch c{
-			case chars:
-			case:
-				bufio.reader_unread_rune(reader)
-				return
+		for char in chars{
+			if char == c{
+				continue skipping
+			}
 		}
+		bufio.reader_unread_rune(reader)
+		return
 	}
 }
 
-parse_metadata_item::proc(reader:^bufio.Reader){
+parse_metadata_row::proc(reader:^bufio.Reader)->(key:string, value:string){
 	// assumes '[' has already been consumed
 	line,e:=bufio.reader_read_slice(reader, '\n')
 	if e!=.None{
 		panic("something went wrong")
 	}
 	key_len:=0
-
-	for char in line{
+	key_scan: for char in line{
 		// FIXME: char could be utf-8 and produce weird behavior
-		disallowed_chars:=[?]u8{'[',']','\n','\t','\'', '\r'}
-		termination_characters:=[?]u8{'\"',' '}
 		switch char{
-			case termination_characters:
-				break
-			case disallowed_chars:
-				panic("disallowed characters")
+			case '\"',' ':
+				break key_scan
+			case '[',']','\n','\t','\'', '\r':
+				panic(fmt.tprint("disallowed character: ",char))
 			case:
 				key_len+=1
 		}
@@ -337,14 +335,12 @@ parse_metadata_item::proc(reader:^bufio.Reader){
 	assert(line[key_len+1] == '\"')
 	val_start:=key_len+2
 	val_len:=0
-	for char in line[val_start:]{
+	val_scan: for char in line[val_start:]{
 		// FIXME: char could be utf-8 and produce weird behavior
-		disallowed_chars:=[?]u8{'[',']','\n'}
-		termination_characters:=[?]u8{'\"'}
 		switch char{
-			case termination_characters:
-				break
-			case disallowed_chars:
+			case '\"':
+				break val_scan
+			case '[',']','\n':
 				panic("disallowed characters")
 			case:
 				val_len+=1
@@ -352,9 +348,11 @@ parse_metadata_item::proc(reader:^bufio.Reader){
 	}
 	assert(line[val_start+val_len]=='\"')
 	assert(line[val_start+val_len+1]==']')
-
-	fmt.print("key:",line[:key_len],"\t")
-	fmt.println("value:",line[val_start:val_start+val_len])
+	key=transmute(string)line[:key_len]
+	value=transmute(string)line[val_start:val_start+val_len]
+	fmt.print("key:",key,"\t")
+	fmt.println("value:",value)
+	return key, value
 }
 
 open_file::proc(filepath:string="data/small.pgn"){
@@ -395,6 +393,8 @@ open_file::proc(filepath:string="data/small.pgn"){
 		if s == 1{
 			// no BOM in the file -> reverting to first character
 			bufio.reader_unread_rune(&reader)
+		}else{
+			fmt.println("skipping BOM in PGN file, BOM has length of ", s)
 		}
 	}
 	Chess_Square :: distinct byte
@@ -406,7 +406,7 @@ open_file::proc(filepath:string="data/small.pgn"){
 		key:string,
 		values: [dynamic]string
 	}
-	// metadata_table: [dynamic]Metadata_Column = make([dynamic]Metadata_Column,18,32)
+	metadata_table: [dynamic]Metadata_Column = make([dynamic]Metadata_Column, 18, 32)
 	Parsing_Stage :: enum{
 		None,
 		Metadata,
@@ -415,18 +415,18 @@ open_file::proc(filepath:string="data/small.pgn"){
 	parsing_stage: Parsing_Stage=.None
 
 	line_count:=1
-	for {
-		r,s, err_rune := bufio.reader_read_rune(&reader)
-
-		if err_rune != io.Error.None{
-			break
-		}
-		notation_piece_runes:=[?]u8{'R','N','B','K','Q'}
+	reader_loop: for {
 		whitespace_runes:=[?]u8{' ', '\n', '\t'}
 		switch parsing_stage{
 			case .None:
 				//skip whitespace
 				skip_characters_in_set(&reader, whitespace_runes)
+				r,s, err_rune := bufio.reader_read_rune(&reader)
+				if err_rune == io.Error.EOF{
+					break
+				}else if err_rune != .None{
+					panic("Error reading file")
+				}
 				if s!=1{
 					panic(fmt.tprintf("PGN syntax error, unexpected multi-byte character at %s:%d", filepath, line_count))
 				}
@@ -437,40 +437,39 @@ open_file::proc(filepath:string="data/small.pgn"){
 				// switch r{
 				switch c{
 					case '[':
-						// bufio.reader_unread_rune(&reader)
+						bufio.reader_unread_rune(&reader)
 						parsing_stage=.Metadata
-					case 'a'..='h':
-						fallthrough
-					case notation_piece_runes:
+						continue reader_loop
+					case 'a'..='h', 'R','N','B','K','Q':
 						bufio.reader_unread_rune(&reader)
 						parsing_stage=.Moves
 					case:
 						panic(fmt.tprintf("PGN syntax error at %s:%d", filepath, line_count))
 				}
 			case .Metadata:
-				// '[' was already consumed
-				// reading key
 				fmt.println("parsing metadata:")
-				for{
-					fmt.println("parsing metadata row")
-					parse_metadata_item(&reader)
+				metadata_parsing: for{
 					r,s, err := bufio.reader_read_rune(&reader)
-					if s==1 && u8(r)=='\n'{
-						parsing_stage=.Moves
-						break
-					}else if s==1 && u8(r)=='['{
-					}else{
-						panic("unexpected thing in PGN file")
+					if s!=1{
+						panic("unexpected multi-byte character")
+					}
+					switch r{
+						case '[':
+							fmt.println("parsing metadata row")
+							key, value:=parse_metadata_row(&reader)
+						case '1'..='9':
+							bufio.reader_unread_rune(&reader)
+							parsing_stage=.Moves
+							break metadata_parsing
+						case ' ', '\t', '\n', '\r':
+						case:
+							panic(fmt.tprint(u8(r)))
 					}
 				}
 			case .Moves:
 				fmt.println("parsing moves")
+				panic("This is not yet implemented")
 		}
-
-		// contents := transmute(string)line[:len(line)-1]
-		// contents := transmute(string)line
-		// contents_trimmed:= strings.trim(contents, "\r\n")
-		// write_log(contents_trimmed)
 	}
 }
 
@@ -496,7 +495,6 @@ all_windows :: proc(ctx: ^mu.Context) {
 				mu.open_popup(ctx, "new_suboptions")
 			}
 			if mu.begin_popup(ctx, "new_suboptions") {
-				// mu.label(ctx, "something nicer")
 				mu.button(ctx, "Game")
 				mu.button(ctx, "Database")
 				mu.end_popup(ctx)
