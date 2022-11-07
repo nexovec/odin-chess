@@ -10,6 +10,7 @@ import os "core:os"
 import io "core:io"
 import bufio "core:bufio"
 import win32 "core:sys/windows"
+import "core:strconv"
 import strings "core:strings"
 // import mem "core:mem"
 // import runtime "core:runtime"
@@ -406,6 +407,7 @@ open_file::proc(filepath:string="data/small.pgn"){
 		key:string,
 		values: [dynamic]string
 	}
+	// FIXME: allocates
 	metadata_table: [dynamic]Metadata_Column = make([dynamic]Metadata_Column, 18, 32)
 	Parsing_Stage :: enum{
 		None,
@@ -468,6 +470,71 @@ open_file::proc(filepath:string="data/small.pgn"){
 				}
 			case .Moves:
 				fmt.println("parsing moves")
+				reader_read_integer_1 :: proc(reader:^bufio.Reader, peek_size:int=3)->(result: int, err:io.Error){
+					// TODO: test
+					bytes, err_peek:=bufio.reader_peek(reader, peek_size+1)
+					result=0
+					if err_peek!=.None{
+						err=err_peek
+						return
+					}
+					len:=0
+					counter: for b in bytes{
+						switch b{
+							case '0'..='9':
+								len+=1
+							case:
+								break counter
+						}
+					}
+					if len==0{
+						err=io.Error.Unknown
+					}else if len==peek_size+1{
+						err=io.Error.Short_Buffer
+					}else{
+						err=.None
+						result = strconv.atoi(transmute(string)bytes[:len])
+					}
+					for i in 0..<len{
+						bufio.reader_read_byte(reader)
+					}
+					return
+				}
+				reader_read_integer_2 :: proc(reader:^bufio.Reader)->(result: int = 0, err:io.Error = .None){
+					// TODO: test
+
+					// FIXME: how to preallocate, omg?
+					buf:[dynamic]byte=make([dynamic]byte,0,context.temp_allocator)
+					reading: for {
+						b, err_read:=bufio.reader_read_byte(reader)
+						if err_read!=.None{
+							err = err_read
+							return
+						}
+						switch b{
+							case '0'..='9':
+								append(&buf, b)
+							case:
+								break reading
+						}
+					}
+					if len(buf)==0{
+						err=io.Error.Unknown
+					}else{
+						// fmt.eprintln(transmute(string)buf[:], len(buf))
+						result = strconv.atoi(transmute(string)buf[:])
+						// assert(result!=0)
+					}
+					return
+				}
+				for {
+					skip_characters_in_set(&reader, [?]u8{' ', '\t'})
+					// reading 
+					num, err:=reader_read_integer_2(&reader)
+					assert(err==.None)
+					fmt.eprintln("move number",num)
+					unimplemented()
+				}
 				panic("This is not yet implemented")
 		}
 	}
