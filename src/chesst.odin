@@ -294,7 +294,7 @@ reset_log :: proc() {
 	state.log_buf_len = 0
 }
 
-skip_characters_in_set :: proc(reader:^bufio.Reader, chars:[$T]u8){
+skip_characters_in_set :: proc(reader:^bufio.Reader, chars:[$T]u8)->(did_consume:bool=false){
 	skipping: for{
 		r,s, err := bufio.reader_read_rune(reader)
 		if err!=.None{
@@ -306,6 +306,7 @@ skip_characters_in_set :: proc(reader:^bufio.Reader, chars:[$T]u8){
 		c:=u8(r)
 		for char in chars{
 			if char == c{
+				did_consume=true
 				continue skipping
 			}
 		}
@@ -409,7 +410,7 @@ open_file::proc(filepath:string="data/small.pgn"){
 	}
 	// FIXME: allocates
 	metadata_table: [dynamic]Metadata_Column = make([dynamic]Metadata_Column, 18, 32)
-	Parsing_Stage :: enum{
+	Parsing_Stage :: enum u8{
 		None,
 		Metadata,
 		Moves
@@ -515,6 +516,7 @@ open_file::proc(filepath:string="data/small.pgn"){
 							case '0'..='9':
 								append(&buf, b)
 							case:
+								bufio.reader_unread_byte(reader)
 								break reading
 						}
 					}
@@ -527,17 +529,145 @@ open_file::proc(filepath:string="data/small.pgn"){
 					}
 					return
 				}
+				//reading full-moves
 				for {
-					skip_characters_in_set(&reader, [?]u8{' ', '\t'})
-					// reading 
+					skip_characters_in_set(&reader, [?]u8{' ', '\t', '\n'})
+					//reading move number
+					char: rune
+					size: int
 					num, err:=reader_read_integer_2(&reader)
 					assert(err==.None)
 					fmt.eprintln("move number",num)
-					unimplemented()
+					consume_char(&reader,'.')
+
+					consume_char(&reader, ' ')
+					parse_half_move(&reader)
+
+					consume_char(&reader, ' ')
+					try_parse_result(&reader)
+					parse_half_move(&reader)
 				}
 				panic("This is not yet implemented")
 		}
 	}
+}
+consume_char :: proc(reader: ^bufio.Reader, char:byte){
+	c, err:=bufio.reader_read_byte(reader)
+	assert(err==.None)
+	assert(c==char)
+}
+
+try_parse_result :: proc(reader: ^bufio.Reader){
+	unimplemented()
+}
+
+parse_half_move :: proc(reader: ^bufio.Reader){
+	//read half-move
+	Piece_Type :: enum u8{
+		Pawn,
+		Rook,
+		Knight,
+		Bishop,
+		Queen,
+		King,
+	}
+	PGN_Half_Move :: struct{
+		piece_type:Piece_Type,
+		known_src_row:bool,
+		known_src_column:bool,
+		src_x:u8,
+		src_y:u8,
+		dest_x:u8,
+		dest_y:u8,
+		is_mate:bool,
+		is_check:bool,
+		is_prequalified:bool,
+		is_kside_castles:bool,
+		is_qside_castles:bool
+	}
+	hm:PGN_Half_Move={}
+	char, size, err:=bufio.reader_read_rune(reader)
+	assert(size==1)
+	switch char{
+		case 'a'..='h':
+			// this means it's a pawn move
+			hm.piece_type=.Pawn
+			// hm.dest_x=u8(char)-'a'
+			bufio.reader_unread_rune(reader)
+		case 'K':
+			hm.piece_type=.King
+		case 'N':
+			hm.piece_type=.Knight
+		case 'R':
+			hm.piece_type=.Rook
+		case 'B':
+			hm.piece_type=.Bishop
+		case 'Q':
+			hm.piece_type=.Queen
+		case 'O':
+			unimplemented("No errors, but I don't know how to parse castling yet")
+		case:
+			panic("pgn syntax error reading half-moves")
+	}
+
+	// TODO: captures
+	// TODO: castles
+	// TODO: annotations
+	/*2 scenarios this solves
+	1. Long form (i.e. exf3, Rbe7)
+	2. short form (i.e. f3, Re7)
+
+	I assume it's the long-form, then I reshuffle the data if it's the short form
+	*/
+	char, size, err=bufio.reader_read_rune(reader)
+	assert(size==1)
+	switch char{
+		case 'x':
+			unimplemented()
+		case 'a'..='h':
+			hm.src_x=u8(char)
+			hm.known_src_column=true
+		case '1'..='8':
+			hm.src_y=u8(char)
+			hm.known_src_row=true
+		case:
+			panic("Syntax error reading PGN file")
+	}
+
+	char, size, err=bufio.reader_read_rune(reader)
+	assert(size==1)
+	switch char{
+		case 'x':
+			unimplemented()
+		case 'a'..='h':
+			// means the move is long-form
+			hm.dest_x=u8(char)
+			char, size, err=bufio.reader_read_rune(reader)
+			assert(size==1)
+			switch char{
+				case '1'..='8':
+					hm.dest_x=u8(char)
+			}
+		case '1'..='8':
+			// means this move is short-form
+			hm.dest_x=hm.src_x
+			hm.known_src_row=false
+
+			hm.dest_y=u8(char)
+		case:
+			panic("")
+	}
+
+	char, size, err=bufio.reader_read_rune(reader)
+	assert(size==1)
+	switch char{
+		case 'x':
+			unimplemented()
+		case 'a'..='h':
+			hm.src_x=u8(char)
+	}
+
+	unimplemented()
 }
 
 
