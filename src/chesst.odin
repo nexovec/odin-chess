@@ -530,6 +530,7 @@ open_file::proc(filepath:string="data/small.pgn"){
 					return
 				}
 				//reading full-moves
+				moves_buffer:=make([dynamic]PGN_Half_Move)
 				for {
 					skip_characters_in_set(&reader, [?]u8{' ', '\t', '\n'})
 					//reading move number
@@ -542,50 +543,91 @@ open_file::proc(filepath:string="data/small.pgn"){
 
 					consume_char(&reader, ' ')
 					parse_half_move(&reader)
+					consume_char(&reader,'+',false)
+					consume_char(&reader,'#',false)
 
 					consume_char(&reader, ' ')
-					try_parse_result(&reader)
+					result, has_result:=try_parse_result(&reader)
+					if has_result{
+						break
+					}
+
 					parse_half_move(&reader)
+					consume_char(&reader,'+',false)
+					consume_char(&reader,'#',false)
+
+
+					consume_char(&reader, ' ')
+					result, has_result=try_parse_result(&reader)
+					if has_result{
+						break
+					}
 				}
 				panic("This is not yet implemented")
 		}
 	}
 }
-consume_char :: proc(reader: ^bufio.Reader, char:byte){
+consume_char :: proc(reader: ^bufio.Reader, char:byte, error_if_not_found:bool=true)->(found:bool){
 	c, err:=bufio.reader_read_byte(reader)
-	assert(err==.None)
-	assert(c==char)
+	if error_if_not_found==true{
+		assert(err==.None)
+		assert(c==char)
+	}
+	if c!=char{
+		bufio.reader_unread_byte(reader)
+		return false
+	}
+	return true
 }
 
-try_parse_result :: proc(reader: ^bufio.Reader){
-	unimplemented()
+Chess_Result :: enum u8{
+	White_Won,
+	Black_Won,
+	Draw
+}
+try_parse_result :: proc(reader: ^bufio.Reader)-> (result:Chess_Result, read:bool=false){
+	buf, err:=bufio.reader_read_slice(reader, '\n')
+	buffer:=transmute(string)buf
+	assert(err==nil, fmt.tprintln(err))
+	switch buffer{
+		case "1-0":
+			result=.White_Won
+			read = true
+		case "0-1":
+			result=.Black_Won
+			read = true
+		case "1/2-1/2":
+			read = true
+			result=.Draw
+	}
+	return
 }
 
-parse_half_move :: proc(reader: ^bufio.Reader){
+Piece_Type :: enum u8{
+	Pawn,
+	Rook,
+	Knight,
+	Bishop,
+	Queen,
+	King,
+}
+PGN_Half_Move :: struct{
+	piece_type:Piece_Type,
+	known_src_row:bool,
+	known_src_column:bool,
+	src_x:u8,
+	src_y:u8,
+	dest_x:u8,
+	dest_y:u8,
+	is_mate:bool,
+	is_check:bool,
+	is_prequalified:bool,
+	is_kside_castles:bool,
+	is_qside_castles:bool
+}
+
+parse_half_move :: proc(reader: ^bufio.Reader)->(hm:PGN_Half_Move={}){
 	//read half-move
-	Piece_Type :: enum u8{
-		Pawn,
-		Rook,
-		Knight,
-		Bishop,
-		Queen,
-		King,
-	}
-	PGN_Half_Move :: struct{
-		piece_type:Piece_Type,
-		known_src_row:bool,
-		known_src_column:bool,
-		src_x:u8,
-		src_y:u8,
-		dest_x:u8,
-		dest_y:u8,
-		is_mate:bool,
-		is_check:bool,
-		is_prequalified:bool,
-		is_kside_castles:bool,
-		is_qside_castles:bool
-	}
-	hm:PGN_Half_Move={}
 	char, size, err:=bufio.reader_read_rune(reader)
 	assert(size==1)
 	switch char{
@@ -647,27 +689,29 @@ parse_half_move :: proc(reader: ^bufio.Reader){
 			switch char{
 				case '1'..='8':
 					hm.dest_x=u8(char)
+				case:
+					panic("PGN loading syntax error")
 			}
+			parse_move_annotation(reader, &hm)
+			return
 		case '1'..='8':
 			// means this move is short-form
 			hm.dest_x=hm.src_x
 			hm.known_src_row=false
-
 			hm.dest_y=u8(char)
+			parse_move_annotation(reader, &hm)
+			return
 		case:
-			panic("")
-	}
-
-	char, size, err=bufio.reader_read_rune(reader)
-	assert(size==1)
-	switch char{
-		case 'x':
-			unimplemented()
-		case 'a'..='h':
-			hm.src_x=u8(char)
+			panic("PGN loading syntax error")
 	}
 
 	unimplemented()
+}
+
+parse_move_annotation :: proc(reader: ^bufio.Reader, move: ^PGN_Half_Move){
+	// TODO: strip tags (i.e. +-, !!, +, #)
+	// TODO: strip annotations
+	// TODO: strip variants
 }
 
 
@@ -900,3 +944,4 @@ all_windows :: proc(ctx: ^mu.Context) {
 	}
 
 }
+ 
