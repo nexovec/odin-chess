@@ -521,7 +521,8 @@ open_file::proc(filepath:string="data/small.pgn"){
 							case '0'..='9':
 								append(&buf, b)
 							case:
-								bufio.reader_unread_byte(reader)
+								err = bufio.reader_unread_byte(reader)
+								assert(err==.None)
 								break reading
 						}
 					}
@@ -536,20 +537,20 @@ open_file::proc(filepath:string="data/small.pgn"){
 				}
 				//reading full-moves
 				moves_buffer:=make([dynamic]PGN_Half_Move)
+				move:PGN_Half_Move
 				for {
 					skip_characters_in_set(&reader, [?]u8{' ', '\t', '\n'})
 					//reading move number
 					char: rune
 					size: int
 					num, err:=reader_read_integer_2(&reader)
-					assert(err==.None)
+					assert(err==.None, fmt.tprint(err,num))
 					fmt.eprintln("move number",num)
 					consume_char(&reader,'.')
 
 					consume_char(&reader, ' ')
-					parse_half_move(&reader)
-					consume_char(&reader,'+',false)
-					consume_char(&reader,'#',false)
+					move=parse_half_move(&reader)
+					append(&moves_buffer, move)
 
 					consume_char(&reader, ' ')
 					result, has_result:=try_parse_result(&reader)
@@ -557,10 +558,7 @@ open_file::proc(filepath:string="data/small.pgn"){
 						break
 					}
 
-					parse_half_move(&reader)
-					consume_char(&reader,'+',false)
-					consume_char(&reader,'#',false)
-
+					move=parse_half_move(&reader)
 
 					consume_char(&reader, ' ')
 					result, has_result=try_parse_result(&reader)
@@ -568,6 +566,7 @@ open_file::proc(filepath:string="data/small.pgn"){
 						break
 					}
 				}
+				fmt.println(len(moves_buffer))
 				panic("This is not yet implemented")
 		}
 	}
@@ -631,8 +630,8 @@ PGN_Half_Move :: struct{
 	is_qside_castles:bool
 }
 
-parse_half_move :: proc(reader: ^bufio.Reader)->(hm:PGN_Half_Move={}){
-	//read half-move
+parse_half_move :: proc(reader: ^bufio.Reader)->(hm:PGN_Half_Move){
+	parse_half_move_no_postfix :: proc(reader:^bufio.Reader)->(hm:PGN_Half_Move={}){
 	char, size, err:=bufio.reader_read_rune(reader)
 	assert(size==1)
 	switch char{
@@ -656,25 +655,44 @@ parse_half_move :: proc(reader: ^bufio.Reader)->(hm:PGN_Half_Move={}){
 		case:
 			panic("pgn syntax error reading half-moves")
 	}
-
-	// TODO: captures
 	// TODO: castles
 	// TODO: annotations
 	/*2 scenarios this solves
 	1. Long form (i.e. exf3, Rbe7)
 	2. short form (i.e. f3, Re7)
-
+	and additionally it parses captures
 	I assume it's the long-form, then I reshuffle the data if it's the short form
 	*/
+	parse_takes :: proc(reader:^bufio.Reader, hm:^PGN_Half_Move){
+		x, err_x:=bufio.reader_read_byte(reader)
+		assert(err_x==.None)
+		y, err_y:=bufio.reader_read_byte(reader)
+		assert(err_y==.None)
+		switch x{
+			case 'a'..='h':
+				hm.dest_x=x
+			case:
+				panic("PGN syntax error")
+		}
+		switch y{
+			case '1'..='8':
+				hm.dest_y=y
+			case:
+				panic(fmt.tprint("PGN syntax error, unexpeted characters:", rune(x), rune(y)))
+		}
+	}
 	char, size, err=bufio.reader_read_rune(reader)
 	assert(size==1)
 	switch char{
 		case 'x':
-			unimplemented()
+			// means the move is short-form
+			parse_takes(reader, &hm)
+			return
 		case 'a'..='h':
 			hm.src_x=u8(char)
 			hm.known_src_column=true
 		case '1'..='8':
+			// means the move is long form
 			hm.src_y=u8(char)
 			hm.known_src_row=true
 		case:
@@ -685,7 +703,9 @@ parse_half_move :: proc(reader: ^bufio.Reader)->(hm:PGN_Half_Move={}){
 	assert(size==1)
 	switch char{
 		case 'x':
-			unimplemented()
+			// means the move is long-form
+			parse_takes(reader, &hm)
+			return
 		case 'a'..='h':
 			// means the move is long-form
 			hm.dest_x=u8(char)
@@ -702,21 +722,39 @@ parse_half_move :: proc(reader: ^bufio.Reader)->(hm:PGN_Half_Move={}){
 		case '1'..='8':
 			// means this move is short-form
 			hm.dest_x=hm.src_x
-			hm.known_src_row=false
+			hm.known_src_column=false
 			hm.dest_y=u8(char)
 			parse_move_annotation(reader, &hm)
 			return
 		case:
 			panic("PGN loading syntax error")
 	}
-
-	unimplemented()
+	}
+	//read half-move
+	hm=parse_half_move_no_postfix(reader)
+	//read post-fix
+	parse_move_annotation(reader, &hm)
+	return
 }
 
 parse_move_annotation :: proc(reader: ^bufio.Reader, move: ^PGN_Half_Move){
-	// TODO: strip tags (i.e. +-, !!, +, #)
-	// TODO: strip annotations
-	// TODO: strip variants
+	// strip tags (+, #)
+	move.is_check=consume_char(reader,'+',false)
+	move.is_mate=consume_char(reader,'#',false)
+	// TODO: strip labels(+-, =, ...)
+
+	// strip annotations
+	// TODO: nested variations and nested comments
+	if consume_char(reader, '(', false){
+		_, err:=bufio.reader_read_slice(reader,')')
+		assert(err==.None)
+	}
+
+	// strip comments
+	if consume_char(reader, '{', false){
+		_, err:=bufio.reader_read_slice(reader,'}')
+		assert(err==.None)
+	}
 }
 
 
