@@ -16,7 +16,7 @@ import strings "core:strings"
 // import runtime "core:runtime"
 // import gl "vendor:OpenGL"
 
-TIME_PER_TICK :i32: 1000/60
+TIME_PER_TICK :i32: 1000/120
 
 Vec2i :: distinct [2]i32
 
@@ -45,12 +45,12 @@ cb_image: ^SDL.Surface
 cb_texture: ^SDL.Texture
 
 main :: proc() {
+	fmt.eprintln("starting up!")
 	if err := SDL.Init({.VIDEO}); err != 0 {
 		fmt.eprintln(err)
 		return
 	}
 	defer SDL.Quit()
-
 	window := SDL.CreateWindow(
 		"microui-odin",
 		SDL.WINDOWPOS_UNDEFINED,
@@ -64,7 +64,6 @@ main :: proc() {
 		return
 	}
 	defer SDL.DestroyWindow(window)
-
 	backend_idx: i32 = -1
 	if n := SDL.GetNumRenderDrivers(); n <= 0 {
 		fmt.eprintln("No render drivers available")
@@ -121,9 +120,15 @@ main :: proc() {
 	// loading chessboard as image
 	SDL_Image.Init(SDL_Image.INIT_PNG)
 	defer SDL_Image.Quit()
+	assert(os.is_file("assets/chessbcg.png"))
+	// cb_image = SDL_Image.Load("assets/chessbcg.bmp")
+	cb_image = SDL_Image.Load("assets/chessbcg.png")
+	// assert(cb_image != nil)
 
-	cb_image = SDL_Image.Load("assets/chessbcg.bmp")
-	assert(cb_image != nil)
+	// cb_image = SDL.LoadBMP("assets/chessbcg.bmp")
+	if(cb_image==nil){
+		panic(fmt.tprint(SDL.GetError()))
+	}
 	defer SDL.FreeSurface(cb_image)
 
 	cb_texture = SDL.CreateTextureFromSurface(renderer, cb_image)
@@ -496,7 +501,7 @@ open_file::proc(filepath:string="data/small.pgn"){
 						err=.None
 						result = strconv.atoi(transmute(string)bytes[:len])
 					}
-					for i in 0..<len{
+					for _ in 0..<len{
 						bufio.reader_read_byte(reader)
 					}
 					return
