@@ -141,6 +141,9 @@ main :: proc() {
 	ctx.text_height = mu.default_atlas_text_height
 
 	lastTick:i32=0
+	when LOAD_PGN_TEST{
+		open_file()
+	}
 	main_loop: for {
 		for e: SDL.Event; SDL.PollEvent(&e);  /**/{
 			#partial switch e.type {
@@ -550,6 +553,7 @@ open_file::proc(filepath:string="data/small.pgn"){
 
 					consume_char(&reader, ' ')
 					move=parse_half_move(&reader)
+					fmt.eprintln(move)
 					append(&moves_buffer, move)
 
 					consume_char(&reader, ' ')
@@ -559,6 +563,7 @@ open_file::proc(filepath:string="data/small.pgn"){
 					}
 
 					move=parse_half_move(&reader)
+					fmt.eprintln(move)
 
 					consume_char(&reader, ' ')
 					result, has_result=try_parse_result(&reader)
