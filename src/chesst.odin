@@ -16,8 +16,6 @@ import strings "core:strings"
 // import runtime "core:runtime"
 // import gl "vendor:OpenGL"
 
-TIME_PER_TICK :i32: 1000/120
-
 Vec2i :: distinct [2]i32
 
 state := struct {
@@ -51,6 +49,13 @@ main :: proc() {
 		return
 	}
 	defer SDL.Quit()
+	display_mode:SDL.DisplayMode
+	SDL.GetCurrentDisplayMode(0,&display_mode)
+	refresh_rate:=display_mode.refresh_rate
+	if refresh_rate == 0 {
+		refresh_rate=60
+	}
+	time_per_tick:i32=1000/refresh_rate
 	window := SDL.CreateWindow(
 		"microui-odin",
 		SDL.WINDOWPOS_UNDEFINED,
@@ -141,8 +146,8 @@ main :: proc() {
 	ctx.text_height = mu.default_atlas_text_height
 
 	lastTick:i32=0
-	when LOAD_PGN_TEST{
-		open_file()
+	when RUN_TESTS{
+		run_tests()
 	}
 	main_loop: for {
 		for e: SDL.Event; SDL.PollEvent(&e);  /**/{
@@ -204,7 +209,7 @@ main :: proc() {
 		mu.end(ctx)
 		render(ctx, renderer)
 
-		for i32(SDL.GetTicks())-lastTick < TIME_PER_TICK{
+		for i32(SDL.GetTicks())-lastTick < time_per_tick{
 			SDL.Delay(1)
 		}
 		lastTick = i32(SDL.GetTicks())
@@ -570,6 +575,7 @@ open_file::proc(filepath:string="data/small.pgn"){
 					if has_result{
 						break
 					}
+					panic("This is just a breakpoint")
 				}
 				fmt.println(len(moves_buffer))
 				panic("This is not yet implemented")
