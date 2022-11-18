@@ -484,106 +484,106 @@ open_file::proc(filepath:string="data/small.pgn"){
 				}
 			case .Moves:
 				fmt.println("parsing moves")
-				reader_read_integer_1 :: proc(reader:^bufio.Reader, peek_size:int=3)->(result: int, err:io.Error){
-					// TODO: test
-					bytes, err_peek:=bufio.reader_peek(reader, peek_size+1)
-					result=0
-					if err_peek!=.None{
-						err=err_peek
-						return
-					}
-					len:=0
-					counter: for b in bytes{
-						switch b{
-							case '0'..='9':
-								len+=1
-							case:
-								break counter
-						}
-					}
-					if len==0{
-						err=io.Error.Unknown
-					}else if len==peek_size+1{
-						err=io.Error.Short_Buffer
-					}else{
-						err=.None
-						result = strconv.atoi(transmute(string)bytes[:len])
-					}
-					for _ in 0..<len{
-						bufio.reader_read_byte(reader)
-					}
-					return
-				}
-				reader_read_integer_2 :: proc(reader:^bufio.Reader)->(result: int = 0, err:io.Error = .None){
-					// TODO: test
-
-					// FIXME: how to preallocate, omg?
-					buf:[dynamic]byte=make([dynamic]byte,0,context.temp_allocator)
-					reading: for {
-						b, err_read:=bufio.reader_read_byte(reader)
-						if err_read!=.None{
-							err = err_read
-							return
-						}
-						switch b{
-							case '0'..='9':
-								append(&buf, b)
-							case:
-								err = bufio.reader_unread_byte(reader)
-								assert(err==.None)
-								break reading
-						}
-					}
-					if len(buf)==0{
-						err=io.Error.Unknown
-					}else{
-						// fmt.eprintln(transmute(string)buf[:], len(buf))
-						result = strconv.atoi(transmute(string)buf[:])
-						// assert(result!=0)
-					}
-					return
-				}
 				//reading full-moves
 				moves_buffer:=make([dynamic]PGN_Half_Move)
 				move:PGN_Half_Move
-				for {
-					skip_characters_in_set(&reader, [?]u8{' ', '\t', '\n'})
-					//reading move number
-					char: rune
-					size: int
-					num, err:=reader_read_integer_2(&reader)
-					assert(err==.None, fmt.tprint(err,num))
-					fmt.eprintln("move number",num)
-					consume_char(&reader,'.')
-
-					consume_char(&reader, ' ')
-					move=parse_half_move(&reader)
-					fmt.eprintln(move)
-					append(&moves_buffer, move)
-
-					consume_char(&reader, ' ')
-					result, has_result:=try_parse_result(&reader)
-					if has_result{
-						break
-					}
-
-					move=parse_half_move(&reader)
-					fmt.eprintln(move)
-
-					consume_char(&reader, ' ')
-					result, has_result=try_parse_result(&reader)
-					if has_result{
-						break
-					}
-					panic("This is just a breakpoint")
-				}
 				fmt.println(len(moves_buffer))
 				panic("This is not yet implemented")
+			}
 		}
 	}
-}
-consume_char :: proc(reader: ^bufio.Reader, char:byte, error_if_not_found:bool=true)->(found:bool){
-	c, err:=bufio.reader_read_byte(reader)
+	reader_read_integer_1 :: proc(reader:^bufio.Reader, peek_size:int=3)->(result: int, err:io.Error){
+		// TODO: test
+		bytes, err_peek:=bufio.reader_peek(reader, peek_size+1)
+		result=0
+		if err_peek!=.None{
+			err=err_peek
+			return
+		}
+		len:=0
+		counter: for b in bytes{
+			switch b{
+				case '0'..='9':
+					len+=1
+				case:
+					break counter
+			}
+		}
+		if len==0{
+			err=io.Error.Unknown
+		}else if len==peek_size+1{
+			err=io.Error.Short_Buffer
+		}else{
+			err=.None
+			result = strconv.atoi(transmute(string)bytes[:len])
+		}
+		for _ in 0..<len{
+			bufio.reader_read_byte(reader)
+		}
+		return
+	}
+	reader_read_integer_2 :: proc(reader:^bufio.Reader)->(result: int = 0, err:io.Error = .None){
+		buf:[dynamic]byte=make([dynamic]byte,0,context.temp_allocator)
+		reading: for {
+			b, err_read:=bufio.reader_read_byte(reader)
+			if err_read!=.None{
+				err = err_read
+				return
+			}
+			switch b{
+				case '0'..='9':
+					append(&buf, b)
+				case:
+					err = bufio.reader_unread_byte(reader)
+					assert(err==.None)
+					break reading
+			}
+		}
+		if len(buf)==0{
+			err=io.Error.Unknown
+		}else{
+			// fmt.eprintln(transmute(string)buf[:], len(buf))
+			result = strconv.atoi(transmute(string)buf[:])
+			// assert(result!=0)
+		}
+		return
+	}
+	pgn_read_moves :: proc(reader: ^bufio.Reader, moves:[dynamic]PGN_Half_Move){
+		moves:=moves
+		for {
+			skip_characters_in_set(reader, [?]u8{' ', '\t', '\n'})
+			//reading move number
+			char: rune
+			size: int
+			num, err:=reader_read_integer_2(reader)
+			assert(err==.None, fmt.tprint(err,num))
+			fmt.eprintln("move number",num)
+			consume_char(reader,'.')
+
+			consume_char(reader, ' ')
+			move:=parse_half_move(reader)
+			fmt.eprintln(move)
+			append(&moves, move)
+
+			consume_char(reader, ' ')
+			result, has_result:=try_parse_result(reader)
+			if has_result{
+				break
+			}
+
+			move=parse_half_move(reader)
+			fmt.eprintln(move)
+
+			consume_char(reader, ' ')
+			result, has_result=try_parse_result(reader)
+			if has_result{
+				break
+			}
+			panic("This is just a breakpoint")
+		}
+	}
+	consume_char :: proc(reader: ^bufio.Reader, char:byte, error_if_not_found:bool=true)->(found:bool){
+		c, err:=bufio.reader_read_byte(reader)
 	if error_if_not_found==true{
 		assert(err==.None)
 		assert(c==char)
@@ -641,8 +641,7 @@ PGN_Half_Move :: struct{
 	is_qside_castles:bool
 }
 
-parse_half_move :: proc(reader: ^bufio.Reader)->(hm:PGN_Half_Move){
-	parse_half_move_no_postfix :: proc(reader:^bufio.Reader)->(hm:PGN_Half_Move={}){
+parse_half_move_no_postfix :: proc(reader:^bufio.Reader)->(hm:PGN_Half_Move={}){
 	char, size, err:=bufio.reader_read_rune(reader)
 	assert(size==1)
 	switch char{
@@ -741,6 +740,8 @@ parse_half_move :: proc(reader: ^bufio.Reader)->(hm:PGN_Half_Move){
 			panic("PGN loading syntax error")
 	}
 	}
+
+parse_half_move :: proc(reader: ^bufio.Reader)->(hm:PGN_Half_Move){
 	//read half-move
 	hm=parse_half_move_no_postfix(reader)
 	//read post-fix
