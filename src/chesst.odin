@@ -43,7 +43,7 @@ cb_image: ^SDL.Surface
 cb_texture: ^SDL.Texture
 
 main :: proc() {
-	fmt.eprintln("starting up!")
+	fmt.eprintln("STARTING PROGRAM!")
 	if err := SDL.Init({.VIDEO}); err != 0 {
 		fmt.eprintln(err)
 		return
@@ -317,8 +317,8 @@ skip_characters_in_set :: proc(reader:^bufio.Reader, chars:[$T]u8)->(did_consume
 			panic("unexpected character")
 		}
 		c:=u8(r)
-		for char in chars{
-			if char == c{
+		for seeked_char in chars{
+			if seeked_char == c{
 				did_consume=true
 				continue skipping
 			}
@@ -335,13 +335,13 @@ parse_metadata_row::proc(reader:^bufio.Reader)->(key:string, value:string){
 		panic("something went wrong")
 	}
 	key_len:=0
-	key_scan: for char in line{
-		// FIXME: char could be utf-8 and produce weird behavior
-		switch char{
+	key_scan: for seeked_char in line{
+		// FIXME: seeked_char could be utf-8 and produce weird behavior
+		switch seeked_char{
 			case '\"',' ':
 				break key_scan
 			case '[',']','\n','\t','\'', '\r':
-				panic(fmt.tprint("disallowed character: ",char))
+				panic(fmt.tprint("disallowed character: ",seeked_char))
 			case:
 				key_len+=1
 		}
@@ -350,9 +350,9 @@ parse_metadata_row::proc(reader:^bufio.Reader)->(key:string, value:string){
 	assert(line[key_len+1] == '\"')
 	val_start:=key_len+2
 	val_len:=0
-	val_scan: for char in line[val_start:]{
-		// FIXME: char could be utf-8 and produce weird behavior
-		switch char{
+	val_scan: for seeked_char in line[val_start:]{
+		// FIXME: seeked_char could be utf-8 and produce weird behavior
+		switch seeked_char{
 			case '\"':
 				break val_scan
 			case '[',']','\n':
@@ -553,7 +553,7 @@ open_file::proc(filepath:string="data/small.pgn"){
 		for {
 			skip_characters_in_set(reader, [?]u8{' ', '\t', '\n'})
 			//reading move number
-			char: rune
+			seeked_char: rune
 			size: int
 			num, err:=reader_read_integer_2(reader)
 			assert(err==.None, fmt.tprint(err,num))
@@ -582,13 +582,13 @@ open_file::proc(filepath:string="data/small.pgn"){
 			panic("This is just a breakpoint")
 		}
 	}
-	consume_char :: proc(reader: ^bufio.Reader, char:byte, error_if_not_found:bool=true)->(found:bool){
+	consume_char :: proc(reader: ^bufio.Reader, seeked_char:byte, error_if_not_found:bool=true)->(found:bool){
 		c, err:=bufio.reader_read_byte(reader)
 	if error_if_not_found==true{
 		assert(err==.None)
-		assert(c==char)
+		assert(c==seeked_char)
 	}
-	if c!=char{
+	if c!=seeked_char{
 		bufio.reader_unread_byte(reader)
 		return false
 	}
@@ -642,13 +642,13 @@ PGN_Half_Move :: struct{
 }
 
 parse_half_move_no_postfix :: proc(reader:^bufio.Reader)->(hm:PGN_Half_Move={}){
-	char, size, err:=bufio.reader_read_rune(reader)
+	seeked_char, size, err:=bufio.reader_read_rune(reader)
 	assert(size==1)
-	switch char{
+	switch seeked_char{
 		case 'a'..='h':
 			// this means it's a pawn move
 			hm.piece_type=.Pawn
-			// hm.dest_x=u8(char)-'a'
+			// hm.dest_x=u8(seeked_char)-'a'
 			bufio.reader_unread_rune(reader)
 		case 'K':
 			hm.piece_type=.King
@@ -691,39 +691,39 @@ parse_half_move_no_postfix :: proc(reader:^bufio.Reader)->(hm:PGN_Half_Move={}){
 				panic(fmt.tprint("PGN syntax error, unexpeted characters:", rune(x), rune(y)))
 		}
 	}
-	char, size, err=bufio.reader_read_rune(reader)
+	seeked_char, size, err=bufio.reader_read_rune(reader)
 	assert(size==1)
-	switch char{
+	switch seeked_char{
 		case 'x':
 			// means the move is short-form
 			parse_takes(reader, &hm)
 			return
 		case 'a'..='h':
-			hm.src_x=u8(char)
+			hm.src_x=u8(seeked_char)
 			hm.known_src_column=true
 		case '1'..='8':
 			// means the move is long form
-			hm.src_y=u8(char)
+			hm.src_y=u8(seeked_char)
 			hm.known_src_row=true
 		case:
 			panic("Syntax error reading PGN file")
 	}
 
-	char, size, err=bufio.reader_read_rune(reader)
+	seeked_char, size, err=bufio.reader_read_rune(reader)
 	assert(size==1)
-	switch char{
+	switch seeked_char{
 		case 'x':
 			// means the move is long-form
 			parse_takes(reader, &hm)
 			return
 		case 'a'..='h':
 			// means the move is long-form
-			hm.dest_x=u8(char)
-			char, size, err=bufio.reader_read_rune(reader)
+			hm.dest_x=u8(seeked_char)
+			seeked_char, size, err=bufio.reader_read_rune(reader)
 			assert(size==1)
-			switch char{
+			switch seeked_char{
 				case '1'..='8':
-					hm.dest_x=u8(char)
+					hm.dest_x=u8(seeked_char)
 				case:
 					panic("PGN loading syntax error")
 			}
@@ -733,7 +733,7 @@ parse_half_move_no_postfix :: proc(reader:^bufio.Reader)->(hm:PGN_Half_Move={}){
 			// means this move is short-form
 			hm.dest_x=hm.src_x
 			hm.known_src_column=false
-			hm.dest_y=u8(char)
+			hm.dest_y=u8(seeked_char)
 			parse_move_annotation(reader, &hm)
 			return
 		case:
@@ -999,4 +999,3 @@ all_windows :: proc(ctx: ^mu.Context) {
 	}
 
 }
- 

@@ -1,3 +1,3 @@
 package main
 
-RUN_TESTS :: true
+RUN_TESTS :: false
