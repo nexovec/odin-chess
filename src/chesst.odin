@@ -643,6 +643,7 @@ PGN_Half_Move :: struct{
 
 parse_half_move_no_postfix :: proc(reader:^bufio.Reader)->(hm:PGN_Half_Move={}){
 	seeked_char, size, err:=bufio.reader_read_rune(reader)
+	assert(err==.None)
 	assert(size==1)
 	switch seeked_char{
 		case 'a'..='h':
@@ -680,18 +681,19 @@ parse_half_move_no_postfix :: proc(reader:^bufio.Reader)->(hm:PGN_Half_Move={}){
 		assert(err_y==.None)
 		switch x{
 			case 'a'..='h':
-				hm.dest_x=x
+				hm.dest_x=x-'a'
 			case:
 				panic("PGN syntax error")
 		}
 		switch y{
 			case '1'..='8':
-				hm.dest_y=y
+				hm.dest_y=y-'1'
 			case:
 				panic(fmt.tprint("PGN syntax error, unexpeted characters:", rune(x), rune(y)))
 		}
 	}
 	seeked_char, size, err=bufio.reader_read_rune(reader)
+	assert(err==.None)
 	assert(size==1)
 	switch seeked_char{
 		case 'x':
@@ -699,17 +701,18 @@ parse_half_move_no_postfix :: proc(reader:^bufio.Reader)->(hm:PGN_Half_Move={}){
 			parse_takes(reader, &hm)
 			return
 		case 'a'..='h':
-			hm.src_x=u8(seeked_char)
+			hm.src_x=u8(seeked_char) - 'a'
 			hm.known_src_column=true
 		case '1'..='8':
 			// means the move is long form
-			hm.src_y=u8(seeked_char)
+			hm.src_y=u8(seeked_char) - '1'
 			hm.known_src_row=true
 		case:
 			panic("Syntax error reading PGN file")
 	}
 
 	seeked_char, size, err=bufio.reader_read_rune(reader)
+	assert(err==.None)
 	assert(size==1)
 	switch seeked_char{
 		case 'x':
@@ -718,12 +721,13 @@ parse_half_move_no_postfix :: proc(reader:^bufio.Reader)->(hm:PGN_Half_Move={}){
 			return
 		case 'a'..='h':
 			// means the move is long-form
-			hm.dest_x=u8(seeked_char)
+			hm.dest_x=u8(seeked_char)-'a'
 			seeked_char, size, err=bufio.reader_read_rune(reader)
+			assert(err==.None)
 			assert(size==1)
 			switch seeked_char{
 				case '1'..='8':
-					hm.dest_x=u8(seeked_char)
+					hm.dest_x=u8(seeked_char)-'1'
 				case:
 					panic("PGN loading syntax error")
 			}
@@ -733,7 +737,7 @@ parse_half_move_no_postfix :: proc(reader:^bufio.Reader)->(hm:PGN_Half_Move={}){
 			// means this move is short-form
 			hm.dest_x=hm.src_x
 			hm.known_src_column=false
-			hm.dest_y=u8(seeked_char)
+			hm.dest_y=u8(seeked_char)-'1'
 			parse_move_annotation(reader, &hm)
 			return
 		case:
