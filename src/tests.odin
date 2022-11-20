@@ -227,56 +227,58 @@ run_tests :: proc() {
 		fmt.eprintln("TEST of pgn half move parsing successful")
 	}
 	{
+		fmt.eprintln("Running the string skipping test")
+		skipped_strings := [?]string{"1/2-1/2", "1-0", "0-1"}
 		{
 			reader_init_from_string(`1/2-1/2ok`, &string_reader, &r)
 			defer bufio.reader_destroy(&r)
-			skipped_strings := [?]string{"1/2-1/2", "1-0", "0-1"}
 			skip_characters_in_set_strings_variant(&r, skipped_strings[:])
 			data, err := bufio.reader_peek(&r, 2)
 			ok_maybe := transmute(string)data
 			assert(ok_maybe == "ok", "test failed")
+			fmt.eprintln("trivial test successful")
 		}
 		{
 			reader_init_from_string(`ok`, &string_reader, &r)
 			defer bufio.reader_destroy(&r)
-			skipped_strings := [?]string{"1/2-1/2", "1-0", "0-1"}
 			skip_characters_in_set_strings_variant(&r, skipped_strings[:])
 			data, err := bufio.reader_peek(&r, 2)
 			ok_maybe := transmute(string)data
 			assert(ok_maybe == "ok", fmt.tprintln("test failed", data))
-			fmt.eprintln("Even this works")
+			fmt.eprintln("Works with no delimiter")
 		}
 		{
 			reader_init_from_string(`1/2-1/2ok1/2-1/2`, &string_reader, &r)
 			defer bufio.reader_destroy(&r)
-			skipped_strings := [?]string{"1/2-1/2", "1-0", "0-1"}
 			skip_characters_in_set_strings_variant(&r, skipped_strings[:])
 			data, err := bufio.reader_peek(&r, 2)
 			ok_maybe := transmute(string)data
 			assert(ok_maybe == "ok", "test failed")
-			fmt.eprintln("Even this works")
+			fmt.eprintln("Works when there are delimiters after when it should return")
 		}
 		{
-			reader_init_from_string(`1-0ok   `, &string_reader, &r)
+			reader_init_from_string(`1-0ok`, &string_reader, &r)
 			defer bufio.reader_destroy(&r)
-			skipped_strings := [?]string{"1/2-1/2", "1-0", "0-1"}
 			skip_characters_in_set_strings_variant(&r, skipped_strings[:])
 			data, err := bufio.reader_peek(&r, 1)
-			assert(err==.None, fmt.tprintln(err))
-			fmt.eprintln(data)
+			assert(err == .None, fmt.tprintln(err))
 			data, err = bufio.reader_peek(&r, 2)
-			assert(err==.None, fmt.tprintln(err))
+			assert(err == .None, fmt.tprintln(err))
 			ok_maybe := transmute(string)data
-			assert(ok_maybe == "ok", fmt.tprintln("test failed", data))
+			assert(
+				ok_maybe == "ok",
+				fmt.tprintln("It doesn't work for the second delimiter:", data),
+			)
+			fmt.eprintln("Works when you find the second delimiter")
 		}
 		{
-			reader_init_from_string(`1/2-1/21/2-1/2ok`, &string_reader, &r)
+			reader_init_from_string(`1/2-1/21-0ok`, &string_reader, &r)
 			defer bufio.reader_destroy(&r)
-			skipped_strings := [?]string{"1/2-1/2", "1-0", "0-1"}
 			skip_characters_in_set_strings_variant(&r, skipped_strings[:])
 			data, err := bufio.reader_peek(&r, 2)
 			ok_maybe := transmute(string)data
 			assert(ok_maybe == "ok", "test failed")
+			fmt.eprintln("Works when you use multiple different delimiters")
 		}
 		fmt.eprintln("TEST of skip_characters_in_set_strings_variant successful")
 	}
