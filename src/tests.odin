@@ -30,27 +30,84 @@ consume_delimited_move :: proc(
 	}
 	return move_string_backing_buffer[:0], .No_Progress
 }
-experimental_parse_fn :: proc(reader: ^bufio.Reader) {
+
+get_piece_type_from_pgn_character :: proc(
+	character: byte,
+) -> (
+	piece_type: Piece_Type,
+	success: bool = true,
+) {
+	switch character {
+	case 'R':
+		piece_type = .Rook
+	case 'N':
+		piece_type = .Knight
+	case 'B':
+		piece_type = .Bishop
+	case 'K':
+		piece_type = .King
+	case 'Q':
+		piece_type = .Queen
+	case 'a' ..= 'h':
+		piece_type = .Pawn
+	case:
+		success = false
+	}
+	return
+}
+parse_half_move_from_pgn :: proc(reader: ^bufio.Reader) {
 	buf: [5]byte = {}
 	move_string, err := consume_delimited_move(reader, &buf)
 	assert(err == .None || err == .EOF, fmt.tprintln(err))
 	// move parsing
-
+	move: PGN_Half_Move = {}
+	success: bool
+	move.piece_type, success = get_piece_type_from_pgn_character(move_string[0])
+	assert(success)
 	if len(move_string) == 2 {
 		fmt.eprintln("casual pawn move")
+		assert(move.piece_type == .Pawn)
+		move.dest_x = move_string[0]
+		move.dest_y = move_string[1]
 	} else if len(move_string) == 3 {
 		fmt.eprintln("casual piece move")
+		move.dest_x = move_string[1]
+		move.dest_y = move_string[2]
 	} else if len(move_string) == 4 {
-		switch move_string[0] {
-		case 'R', 'N', 'B', 'K', 'Q':
-			fmt.eprintln("casual piece move")
-		case 'a' ..= 'h':
-			fmt.eprintln("pre-qualified pawn move")
+		#partial switch move.piece_type {
+		case .Pawn:
+			assert(move_string[1] == 'x')
+			move.src_x = move_string[0]
+			move.known_src_column = true
+			move.dest_x = move_string[2]
+			move.dest_y = move_string[3]
 		case:
-			panic("PGN move syntax error")
+			switch move_string[1] {
+			case 'a' ..= 'h':
+				move.known_src_column = true
+				move.src_y = move_string[1]
+			case '1' ..= '8':
+				move.known_src_row = true
+				move.src_x = move_string[1]
+			}
+			move.dest_x = move_string[2]
+			move.dest_y = move_string[3]
 		}
+		fmt.println(move.piece_type, "takes on", rune(move.dest_x), rune(move.dest_y))
+		return
 	} else if len(move_string) == 5 {
-		fmt.eprintln("pre-qualified piece move")
+		assert(move_string[2] == 'x')
+		switch move_string[1] {
+		case 'a' ..= 'h':
+			move.known_src_column = true
+		case '1' ..= '8':
+			move.known_src_row = true
+		case:
+			panic("PGN syntax error")
+		}
+		move.dest_x = move_string[3]
+		move.dest_y = move_string[4]
+		fmt.println(move.piece_type, "takes on", rune(move.dest_x), rune(move.dest_y))
 	} else {
 		panic("This is impossible.")
 	}
@@ -67,16 +124,48 @@ reader_init_from_string :: proc(
 }
 run_tests :: proc() {
 	fmt.println("RUNNING TESTS")
+	r: bufio.Reader
+	string_reader: strings.Reader
 	{
-		r: bufio.Reader
-		string_reader: strings.Reader
 		reader_init_from_string(`e4`, &string_reader, &r)
 		defer bufio.reader_destroy(&r)
-		// half_move := parse_half_move_no_postfix(&r)
-		// fmt.eprintln(half_move)
-		experimental_parse_fn(&r)
+		parse_half_move_from_pgn(&r)
 	}
 	fmt.eprintln("test 1 successful")
+
+	// {
+	// 	reader_init_from_string(`ed4`, &string_reader, &r)
+	// 	defer bufio.reader_destroy(&r)
+	// 	parse_half_move_from_pgn(&r)
+	// 	fmt.eprintln("This should never happen")
+	// }
+	{
+		reader_init_from_string(`Rd4`, &string_reader, &r)
+		defer bufio.reader_destroy(&r)
+		parse_half_move_from_pgn(&r)
+	}
+	fmt.eprintln("test 2 successful")
+
+	{
+		reader_init_from_string(`Rbe4`, &string_reader, &r)
+		defer bufio.reader_destroy(&r)
+		parse_half_move_from_pgn(&r)
+	}
+	fmt.eprintln("test 3 successful")
+
+	{
+		reader_init_from_string(`exd4`, &string_reader, &r)
+		defer bufio.reader_destroy(&r)
+		parse_half_move_from_pgn(&r)
+	}
+	fmt.eprintln("test 4 successful")
+
+	{
+		reader_init_from_string(`Rbxe4`, &string_reader, &r)
+		defer bufio.reader_destroy(&r)
+		parse_half_move_from_pgn(&r)
+	}
+	fmt.eprintln("test 5 successful")
 	// pgn_test_1(`1. e4 d5`)
 	// fmt.eprintln("test 2 successful")
 	// pgn_test_1(`1. e4 d5 1-0`)
