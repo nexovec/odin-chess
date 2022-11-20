@@ -308,45 +308,6 @@ reset_log :: proc() {
 }
 
 skip_characters_in_set_strings_variant::proc(reader:^bufio.Reader, skipped_strings:[]string)->(did_consume:bool=false){
-	// indices:[$T]i32 = {}
-	// filled:[$T]bool = {}
-	// failed:[$T]bool = {}
-
-	// for {
-	// 	r,s,err:=bufio.reader_read_rune(reader)
-	// 	assert(err==.None, fmt.tprintln(err))
-	// 	failed_count:=0
-	// 	for i=1;i<$T;i+=1{
-	// 		compared_string = skipped_strings[i]
-	// 		if i>=len(compared_string) {
-	// 			failed_count+=1
-	// 			failed[i]=true
-	// 		}
-	// 		if failed[i] || filled[i]{
-	// 			continue
-	// 		}
-	// 		compared_char = compared_string[indides[i]]
-	// 		if r==compared_char{
-	// 			indices[i]+=1
-	// 		}else{
-	// 			failed_count+=1
-	// 			failed[i]=true
-	// 		}
-	// 	}
-	// 	if failed_count==$T{
-	// 		bufio.reader_unread_rune(reader)
-	// 		break
-	// 	}
-	// }
-	// // TODO: check if `=0` is demanded, and if it even works
-	// found:string=0
-	// for val, key in indices{
-	// 	if len(val)>len(found){
-	// 		found=val
-	// 	}
-	// }
-
-
 	get_longest_of_strings :: proc(strings:[]string)->(s:string){
 		s=strings[0]
 		for val, key in strings{
@@ -356,49 +317,9 @@ skip_characters_in_set_strings_variant::proc(reader:^bufio.Reader, skipped_strin
 		}
 		return
 	}
-	// longest_of_strings:=get_longest_of_strings(skipped_strings)
-	// slice, err:=bufio.reader_peek(reader, len(longest_of_strings))
-	// indices:=make([]int, len(skipped_strings), context.temp_allocator)
-	// // for _, i in indices{
-	// // 	indices[i] = 0
-	// // }
-	// // defer delete(indices)
-	// failed:=make([]bool, len(skipped_strings), context.temp_allocator)
-	// // defer delete(failed)
-	// // for _, i in failed{
-	// // 	failed[i] = false
-	// // }
-	// for i:=0;i<len(longest_of_strings);i+=1{
-	// 	c,err:=bufio.reader_read_byte(reader)
-	// 	for val, key in skipped_strings{
-	// 		if len(val)<=indices[key]{
-	// 			continue
-	// 		}
-	// 		if val[indices[key]] == c{
-	// 			indices[key]+=1
-	// 		}else{
-	// 			failed[key] = true
-	// 		}
-	// 	}
-	// }
-	// top_score:string=""
-	// for val, key in skipped_strings{
-	// 	if failed[key] == false && indices[key] == len(val) && len(val)>len(top_score){
-	// 		did_consume=true
-	// 		top_score=val
-	// 	}
-	// }
-	// reader_skip_runes::proc(reader:^bufio.Reader, n: int){
-	// 	for i:=0;i<n;i+=1{
-	// 		bufio.reader_read_rune(reader)
-	// 	}
-	// }
-	// if did_consume{
-	// 	reader_skip_runes(reader, len(top_score))
-	// 	skip_characters_in_set_strings_variant(reader, skipped_strings)
-	// }
 	s:=get_longest_of_strings(skipped_strings)
 	data, err:=bufio.reader_peek(reader, len(s))
+	// TODO: test if it reads until the end of the stream even if .EOF is returned
 	// i:=0
 	// for err==.EOF && len(s)-i>=0{
 	// 	data, err=bufio.reader_peek(reader, len(s)-i)

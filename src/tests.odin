@@ -66,8 +66,9 @@ parse_half_move_from_pgn :: proc(
 	move_string, err := consume_delimited_move(reader, &buf)
 	assert(err == .None || err == .EOF, fmt.tprintln(err))
 	// move parsing
-	move.piece_type, success = get_piece_type_from_pgn_character(move_string[0])
-	if success == false {
+	s: bool
+	move.piece_type, s = get_piece_type_from_pgn_character(move_string[0])
+	if s == false {
 		return
 	}
 	if len(move_string) == 2 {
@@ -78,6 +79,9 @@ parse_half_move_from_pgn :: proc(
 		move.dest_x = move_string[0]
 		move.dest_y = move_string[1]
 	} else if len(move_string) == 3 {
+		if move.piece_type == .Pawn {
+			return
+		}
 		fmt.eprintln("casual piece move")
 		move.dest_x = move_string[1]
 		move.dest_y = move_string[2]
@@ -124,6 +128,7 @@ parse_half_move_from_pgn :: proc(
 	} else {
 		panic("This is impossible.")
 	}
+	success = true
 	return
 }
 reader_read_integer :: proc(reader: ^bufio.Reader) -> (result: i16 = 0, err: io.Error = .None) {
@@ -191,37 +196,32 @@ reader_init_from_string :: proc(
 run_tests :: proc() {
 	fmt.println("RUNNING TESTS")
 	r: bufio.Reader
+	defer bufio.reader_destroy(&r)
 	string_reader: strings.Reader
 	{
 		{
 			reader_init_from_string(`e4`, &string_reader, &r)
-			defer bufio.reader_destroy(&r)
 			parse_half_move_from_pgn(&r)
 		}
-		// {
-		// 	reader_init_from_string(`ed4`, &string_reader, &r)
-		// 	defer bufio.reader_destroy(&r)
-		// 	parse_half_move_from_pgn(&r)
-		// 	fmt.eprintln("This should never happen")
-		// }
+		{
+			reader_init_from_string(`ed4`, &string_reader, &r)
+			thing, success := parse_half_move_from_pgn(&r)
+			assert(success == false, fmt.tprintln("test failed", thing)) // this should be unsuccessful, because `ed4` is not a valid half move
+		}
 		{
 			reader_init_from_string(`Rd4`, &string_reader, &r)
-			defer bufio.reader_destroy(&r)
 			parse_half_move_from_pgn(&r)
 		}
 		{
 			reader_init_from_string(`Rbe4`, &string_reader, &r)
-			defer bufio.reader_destroy(&r)
 			parse_half_move_from_pgn(&r)
 		}
 		{
 			reader_init_from_string(`exd4`, &string_reader, &r)
-			defer bufio.reader_destroy(&r)
 			parse_half_move_from_pgn(&r)
 		}
 		{
 			reader_init_from_string(`Rbxe4`, &string_reader, &r)
-			defer bufio.reader_destroy(&r)
 			parse_half_move_from_pgn(&r)
 		}
 		fmt.eprintln("TEST of pgn half move parsing successful")
@@ -231,7 +231,6 @@ run_tests :: proc() {
 		skipped_strings := [?]string{"1/2-1/2", "1-0", "0-1"}
 		{
 			reader_init_from_string(`1/2-1/2ok`, &string_reader, &r)
-			defer bufio.reader_destroy(&r)
 			skip_characters_in_set_strings_variant(&r, skipped_strings[:])
 			data, err := bufio.reader_peek(&r, 2)
 			ok_maybe := transmute(string)data
@@ -240,7 +239,6 @@ run_tests :: proc() {
 		}
 		{
 			reader_init_from_string(`ok`, &string_reader, &r)
-			defer bufio.reader_destroy(&r)
 			skip_characters_in_set_strings_variant(&r, skipped_strings[:])
 			data, err := bufio.reader_peek(&r, 2)
 			ok_maybe := transmute(string)data
@@ -249,7 +247,6 @@ run_tests :: proc() {
 		}
 		{
 			reader_init_from_string(`1/2-1/2ok1/2-1/2`, &string_reader, &r)
-			defer bufio.reader_destroy(&r)
 			skip_characters_in_set_strings_variant(&r, skipped_strings[:])
 			data, err := bufio.reader_peek(&r, 2)
 			ok_maybe := transmute(string)data
@@ -258,7 +255,6 @@ run_tests :: proc() {
 		}
 		{
 			reader_init_from_string(`1-0ok`, &string_reader, &r)
-			defer bufio.reader_destroy(&r)
 			skip_characters_in_set_strings_variant(&r, skipped_strings[:])
 			data, err := bufio.reader_peek(&r, 1)
 			assert(err == .None, fmt.tprintln(err))
@@ -273,7 +269,6 @@ run_tests :: proc() {
 		}
 		{
 			reader_init_from_string(`1/2-1/21-0ok`, &string_reader, &r)
-			defer bufio.reader_destroy(&r)
 			skip_characters_in_set_strings_variant(&r, skipped_strings[:])
 			data, err := bufio.reader_peek(&r, 2)
 			ok_maybe := transmute(string)data
