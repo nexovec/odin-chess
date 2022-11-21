@@ -166,18 +166,30 @@ parse_full_move_from_pgn :: proc(
 	err: io.Error
 	full_move.move_number, err = reader_read_integer(reader)
 	success &= (err == .None)
+	dot: byte
+	dot, err = bufio.reader_read_byte(reader)
+	success &= (err == .None)
 	acceptable_delimiters := [?]u8{' ', '\n', '\t'}
 	skip_characters_in_set(reader = reader, chars = acceptable_delimiters)
-	parse_half_move_from_pgn(reader)
+	half_move, s := parse_half_move_from_pgn(reader)
+	success &= s
 	// parse move descriptors(+ and #)
 	// NOTE: move descriptors are currently being stripped completely
 	if skip_characters_in_set(reader, [?]u8{'+', '#'}) {
 		fmt.eprintln("skipping a move descriptor")
 	}
+	half_move, s = parse_half_move_from_pgn(reader)
+	success &= s
+	if skip_characters_in_set(reader, [?]u8{'+', '#'}) {
+		fmt.eprintln("skipping a move descriptor")
+	}
+	skip_characters_in_set(reader = reader, chars = acceptable_delimiters)
 
 	// game result string
 	skipped_strings := [?]string{"1/2-1/2", "1-0", "0-1"}
-	skip_characters_in_set_strings_variant(reader, skipped_strings[:])
+	if skip_characters_in_set_strings_variant(reader, skipped_strings[:]) {
+		fmt.eprintln("Got a game result")
+	}
 	// panic("Oops, you forgot to finish your job.")
 
 	// TODO: annotation parsing
@@ -276,6 +288,19 @@ run_tests :: proc() {
 			fmt.eprintln("Works when you use multiple different delimiters")
 		}
 		fmt.eprintln("TEST of skip_characters_in_set_strings_variant successful")
+	}
+	{
+		{
+			reader_init_from_string(`1. e4 d5 1/2-1/2ok`, &string_reader, &r)
+			// skip_characters_in_set_strings_variant(&r, skipped_strings[:])
+			full_move, success:=parse_full_move_from_pgn(&r)
+			assert(success==true,fmt.tprintln(full_move))
+			data, err := bufio.reader_peek(&r, 2)
+			ok_maybe := transmute(string)data
+			assert(ok_maybe == "ok", "test failed")
+			fmt.eprintln("Parsing full moves works")
+		}
+		fmt.eprintln("TEST of full move parsing successful")
 	}
 	// pgn_test_1(`1. e4 d5`)
 	// fmt.eprintln("test 2 successful")
