@@ -24,6 +24,10 @@ consume_delimited_move :: proc(
 		}
 		switch c {
 		case ' ', '\t', '\n', '#', '+', '-', '=':
+			if i==0{
+				break
+			}
+			bufio.reader_unread_byte(reader)
 			return move_string_backing_buffer[:i], .None
 		}
 		move_string_backing_buffer[i] = c
@@ -290,6 +294,10 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, succ
 	move, read := parse_half_move_from_pgn(reader)
 	if read{
 		// fmt.eprintln(move)
+		{
+			preview, preview_err := bufio.reader_peek(reader, 5)
+			fmt.eprintln("Preview 3:", transmute(string)preview, preview_err)
+		}
 		opt_move_postfix, err_postfix:=bufio.reader_read_byte(reader)
 		result = move
 		success = true
@@ -308,6 +316,7 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, succ
 			case '+', '#':
 				fmt.eprintln("Found a check/mate")
 			case:
+				fmt.eprintln(opt_move_postfix)
 				success = false
 				return
 		}
@@ -441,16 +450,6 @@ run_tests :: proc() {
 		fmt.eprintln("TEST of skip_characters_in_set_strings_variant successful")
 	}
 	{
-		{
-			reader_init_from_string(`1. e4 d5 1/2-1/2ok`, &string_reader, &r)
-			// skip_characters_in_set_strings_variant(&r, skipped_strings[:])
-			full_move, success := parse_full_move_from_pgn(&r)
-			assert(success == true, fmt.tprintln(full_move))
-			data, err := bufio.reader_peek(&r, 2)
-			ok_maybe := transmute(string)data
-			assert(ok_maybe == "ok", "test failed")
-			fmt.eprintln("Parsing full moves works")
-		}
 		parse_token_from_string_test::proc(reader:^bufio.Reader, string_reader: ^strings.Reader, thing:string)->PGN_Parser_Token{
 			reader_init_from_string(thing, string_reader, reader)
 			// skip_characters_in_set_strings_variant(&r, skipped_strings[:])
@@ -465,6 +464,22 @@ run_tests :: proc() {
 		fmt.eprintln("TEST parsing chess results as tokens successful")
 		parse_token_from_string_test(&r, &string_reader, `e4`)
 		fmt.eprintln("TEST parsing chess moves as tokens successful")
+		{
+			reader_init_from_string(`1. e4 d5 1/2-1/2ok`, &string_reader, &r)
+			token, success := parse_pgn_token(&r)
+			assert(success == true, fmt.tprintln(token))
+			_=token.(Move_Number)
+			token, success = parse_pgn_token(&r)
+			assert(success == true, fmt.tprintln(token))
+			_=token.(PGN_Half_Move)
+			token, success = parse_pgn_token(&r)
+			assert(success == true, fmt.tprintln(token))
+			_=token.(PGN_Half_Move)
+			token, success = parse_pgn_token(&r)
+			assert(success == true, fmt.tprintln(token))
+			_=token.(Chess_Result)
+		}
+		fmt.eprintln("TEST parsing multiple pgn tokens sequentially works")
 		// {
 		// 	reader_init_from_string(`1. e4 d5 1/2-1/2ok`, &string_reader, &r)
 		// 	// skip_characters_in_set_strings_variant(&r, skipped_strings[:])
