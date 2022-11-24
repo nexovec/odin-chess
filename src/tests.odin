@@ -63,11 +63,12 @@ parse_half_move_from_pgn :: proc(
 	success: bool = false,
 ) {
 	buf: [5]byte = {}
-	move_string, err := consume_delimited_move(reader, &buf)
+	move_bytes, err := consume_delimited_move(reader, &buf)
 	assert(err == .None || err == .EOF, fmt.tprintln(err))
+	move_string := cast(string)move_bytes
 	// move parsing
 	s: bool
-	move.piece_type, s = get_piece_type_from_pgn_character(move_string[0])
+	move.piece_type, s = get_piece_type_from_pgn_character(move_bytes[0])
 	if s == false {
 		return
 	}
@@ -131,29 +132,36 @@ parse_half_move_from_pgn :: proc(
 	success = true
 	return
 }
-reader_read_integer :: proc(reader: ^bufio.Reader) -> (result: i16 = 0, err: io.Error = .None) {
+reader_read_integer :: proc(reader: ^bufio.Reader) -> (result: u16 = 0, success:bool=false) {
+	// TODO: test for `000x` kind of strings
 	buf: [dynamic]byte = make([dynamic]byte, 0, context.temp_allocator)
 	reading: for {
 		b, err_read := bufio.reader_read_byte(reader)
-		if err_read != .None {
-			err = err_read
+		if err_read == .EOF{
+			break reading
+		}
+		else if err_read != .None{
+			// err = err_read
 			return
 		}
 		switch b {
 		case '0' ..= '9':
 			append(&buf, b)
 		case:
-			err = bufio.reader_unread_byte(reader)
+			err := bufio.reader_unread_byte(reader)
 			assert(err == .None)
 			break reading
 		}
 	}
 	if len(buf) == 0 {
-		err = io.Error.Unknown
+		return
 	} else {
 		// fmt.eprintln(transmute(string)buf[:], len(buf))
-		result = i16(strconv.atoi(transmute(string)buf[:]))
-		// assert(result!=0)
+		success = true
+		s:=transmute(string)buf[:]
+		fmt.eprintln("This is a number:", s)
+		result = u16(strconv.atoi(s))
+		assert(result!=0) // TODO: it should work with zero, but not where I'm using it.
 	}
 	return
 }
@@ -163,11 +171,10 @@ parse_full_move_from_pgn :: proc(
 	full_move: PGN_Full_Move = {},
 	success: bool = true,
 ) {
-	err: io.Error
-	full_move.move_number, err = reader_read_integer(reader)
-	success &= (err == .None)
-	dot: byte
-	dot, err = bufio.reader_read_byte(reader)
+	// TODO: this is broken, use parse_pgn_token instead
+	full_move.move_number, success = reader_read_integer(reader)
+	success &= success
+	dot, err := bufio.reader_read_byte(reader)
 	success &= (err == .None)
 	acceptable_delimiters := [?]u8{' ', '\n', '\t'}
 	skip_characters_in_set(reader = reader, chars = acceptable_delimiters)
@@ -196,6 +203,126 @@ parse_full_move_from_pgn :: proc(
 	// TODO: variation parsing
 	return
 }
+PGN_Game :: struct{
+	moves:[]PGN_Half_Move,
+	result:Chess_Result
+}
+Move_Number :: distinct u16
+PGN_Metadata :: distinct struct{}
+Empty_Line :: distinct struct{}
+PGN_Parser_Token :: union{
+	Move_Number,
+	PGN_Half_Move,
+	Chess_Result,
+	PGN_Metadata,
+	Empty_Line
+}
+parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, success:bool){
+	{
+		preview, preview_err := bufio.reader_peek(reader, 5)
+		fmt.eprintln("Parsing:", preview, preview_err)
+	}
+	// skip an optional space, return Empty_Line if there's an empty line
+	bytes, err := bufio.reader_peek(reader, 1)
+	if err != .None{
+		return
+	}
+	c := bytes[0]
+	switch c{
+		case ' ':
+			bufio.reader_read_byte(reader)
+		case '\n':
+			bufio.reader_read_byte(reader)
+			c, err := bufio.reader_peek(reader,1)
+			if err==.None && c[1]=='\n'{
+				bufio.reader_read_byte(reader)
+				result = Empty_Line{}
+				success = true
+				return
+			}
+	}
+	result_strings := []string{"1-0", "0-1", "1/2-1/2"}
+	corresponding_val := []Chess_Result{.White_Won, .Black_Won, .Draw}
+	// detect results
+	for result_string, index_of_result_string in result_strings{
+		bytes, err := bufio.reader_peek(reader, len(result_string))
+		text := transmute(string)bytes
+		if text == result_string{
+			for i:=0; i<len(text); i+=1{
+				bufio.reader_read_byte(reader)
+			}
+			success = true
+			result = corresponding_val[index_of_result_string]
+			return
+		}
+		if err==.EOF{
+			continue
+		}
+		else if err != .None{
+			return
+		}
+	}
+
+	{
+		preview, preview_err := bufio.reader_peek(reader, 5)
+		fmt.eprintln("Preview:", preview, preview_err)
+	}
+	// detect move number
+	move_number, read_success := reader_read_integer(reader)
+	if read_success{
+		c, err = bufio.reader_read_byte(reader)
+		success = true
+		if err !=.None || c!='.'{
+			success = false
+		}
+		result = cast(Move_Number)move_number
+		return
+	}
+	else{
+		fmt.eprintln(move_number)
+	}
+
+	{
+		preview, preview_err := bufio.reader_peek(reader, 5)
+		fmt.eprintln("Preview 2:", preview, preview_err)
+	}
+	// detect half moves
+	move, read := parse_half_move_from_pgn(reader)
+	if read{
+		// fmt.eprintln(move)
+		opt_move_postfix, err_postfix:=bufio.reader_read_byte(reader)
+		result = move
+		success = true
+		if err_postfix == .EOF{
+			return
+		}
+		else if err_postfix!=.None{
+			success = false
+			return
+		}
+		switch opt_move_postfix{
+			case ' ', '\n', '\t':
+				bufio.reader_unread_byte(reader)
+			case '{', '(':
+				panic("Found a variant/commentary")
+			case '+', '#':
+				fmt.eprintln("Found a check/mate")
+			case:
+				success = false
+				return
+		}
+		return
+	}
+	return
+}
+parse_full_game_from_pgn :: proc(reader:^bufio.Reader) -> (game: PGN_Game, success: bool){
+	delimiters := [?]u8{' ', '\n', '\t'}
+	// unimplemented("Implementation is waiting for tests of parse_pgn_token")
+	// skip_character_in_set(reader, delimiters)
+	fmt.eprintln("Skipping this")
+
+	return
+}
 reader_init_from_string :: proc(
 	sample_string: string,
 	string_reader: ^strings.Reader,
@@ -206,6 +333,14 @@ reader_init_from_string :: proc(
 	bufio.reader_init(reader, r)
 }
 run_tests :: proc() {
+	// {
+	// 	backing_buf:=[17]u8{}
+	// 	test_buf:=backing_buf[:]
+	// 	// test_transmuted:=transmute([]u64)test_buf
+	// 	thing:=transmute([2]u64)test_buf
+	// 	test_transmuted:=thing[0]
+	// 	fmt.eprintln(test_buf, test_transmuted)
+	// }
 	fmt.println("RUNNING TESTS")
 	r: bufio.Reader
 	defer bufio.reader_destroy(&r)
@@ -237,6 +372,22 @@ run_tests :: proc() {
 			parse_half_move_from_pgn(&r)
 		}
 		fmt.eprintln("TEST of pgn half move parsing successful")
+	}
+	{
+		{
+			reader_init_from_string(`1`, &string_reader, &r)
+			thing, s := reader_read_integer(&r)
+			assert(thing == 1 && s == true, fmt.tprintln(thing, s))
+		}
+		{
+			reader_init_from_string(`37.`, &string_reader, &r)
+			thing, s := reader_read_integer(&r)
+			assert(thing == 37 && s == true, fmt.tprintln(thing, s))
+			dot, err := bufio.reader_read_byte(&r)
+			assert(err==.None)
+			assert(dot=='.')
+		}
+		fmt.eprintln("TEST of reading integers from a reader successful")
 	}
 	{
 		fmt.eprintln("Running the string skipping test")
@@ -293,13 +444,38 @@ run_tests :: proc() {
 		{
 			reader_init_from_string(`1. e4 d5 1/2-1/2ok`, &string_reader, &r)
 			// skip_characters_in_set_strings_variant(&r, skipped_strings[:])
-			full_move, success:=parse_full_move_from_pgn(&r)
-			assert(success==true,fmt.tprintln(full_move))
+			full_move, success := parse_full_move_from_pgn(&r)
+			assert(success == true, fmt.tprintln(full_move))
 			data, err := bufio.reader_peek(&r, 2)
 			ok_maybe := transmute(string)data
 			assert(ok_maybe == "ok", "test failed")
 			fmt.eprintln("Parsing full moves works")
 		}
+		parse_token_from_string_test::proc(reader:^bufio.Reader, string_reader: ^strings.Reader, thing:string)->PGN_Parser_Token{
+			reader_init_from_string(thing, string_reader, reader)
+			// skip_characters_in_set_strings_variant(&r, skipped_strings[:])
+			token, success := parse_pgn_token(reader)
+			assert(success == true, fmt.tprintln(token))
+			fmt.eprintln("Parsing full moves works")
+			return token
+		}
+		_=parse_token_from_string_test(&r, &string_reader, `1.`).(Move_Number)
+		fmt.eprintln("TEST parsing move numbers as tokens successful")
+		_=parse_token_from_string_test(&r, &string_reader, `1-0`).(Chess_Result)
+		fmt.eprintln("TEST parsing chess results as tokens successful")
+		parse_token_from_string_test(&r, &string_reader, `e4`)
+		fmt.eprintln("TEST parsing chess moves as tokens successful")
+		// {
+		// 	reader_init_from_string(`1. e4 d5 1/2-1/2ok`, &string_reader, &r)
+		// 	// skip_characters_in_set_strings_variant(&r, skipped_strings[:])
+		// 	// full_move, success:=parse_full_move_from_pgn(&r)
+		// 	full_game, success := parse_full_game_from_pgn(&r)
+		// 	assert(success == true, fmt.tprintln(full_game))
+		// 	data, err := bufio.reader_peek(&r, 2)
+		// 	ok_maybe := transmute(string)data
+		// 	assert(ok_maybe == "ok", "test failed")
+		// 	fmt.eprintln("Parsing full moves works")
+		// }
 		fmt.eprintln("TEST of full move parsing successful")
 	}
 	// pgn_test_1(`1. e4 d5`)

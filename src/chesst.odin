@@ -349,25 +349,29 @@ skip_characters_in_set_strings_variant::proc(reader:^bufio.Reader, skipped_strin
 	}
 	return
 }
-skip_characters_in_set :: proc(reader:^bufio.Reader, chars:[$T]u8)->(did_consume:bool=false){
-	skipping: for{
-		r,s, err := bufio.reader_read_rune(reader)
-		if err!=.None{
-			panic("Error happened!")
-		}
-		if s!=1{
-			panic("unexpected character")
-		}
-		c:=u8(r)
-		for seeked_char in chars{
-			if seeked_char == c{
-				did_consume=true
-				continue skipping
-			}
-		}
-		bufio.reader_unread_rune(reader)
-		return
+skip_character_in_set :: proc(reader:^bufio.Reader, chars:[$T]u8)->(did_consume:bool=false){
+	r,s, err := bufio.reader_read_rune(reader)
+	if err!=.None && err!=.EOF{
+		panic("Error happened!")
 	}
+	if s!=1{
+		panic("unexpected character")
+	}
+	c:=u8(r)
+	for seeked_char in chars{
+		if seeked_char == c{
+			did_consume=true
+			return
+		}
+	}
+	bufio.reader_unread_rune(reader)
+	return
+}
+skip_characters_in_set :: proc(reader:^bufio.Reader, chars:[$T]u8)->(did_consume:bool=false){
+	for skip_character_in_set(reader, chars){
+		did_consume = true
+	}
+	return
 }
 
 parse_metadata_row::proc(reader:^bufio.Reader)->(key:string, value:string){
@@ -571,8 +575,8 @@ open_file::proc(filepath:string="data/small.pgn"){
 			//reading move number
 			seeked_char: rune
 			size: int
-			num, err:=reader_read_integer(reader)
-			assert(err==.None, fmt.tprint(err,num))
+			num, read_success:=reader_read_integer(reader)
+			assert(read_success, fmt.tprint(read_success,num))
 			fmt.eprintln("move number",num)
 			consume_char(reader,'.')
 
@@ -612,6 +616,7 @@ open_file::proc(filepath:string="data/small.pgn"){
 }
 
 Chess_Result :: enum u8{
+	Undecided,
 	White_Won,
 	Black_Won,
 	Draw
@@ -643,7 +648,7 @@ Piece_Type :: enum u8{
 	King,
 }
 PGN_Full_Move :: struct{
-	move_number: i16,
+	move_number: u16,
 	has_both_halves:bool,
 	first_half:PGN_Half_Move,
 	second_half:PGN_Half_Move,
