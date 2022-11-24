@@ -169,44 +169,44 @@ reader_read_integer :: proc(reader: ^bufio.Reader) -> (result: u16 = 0, success:
 	}
 	return
 }
-parse_full_move_from_pgn :: proc(
-	reader: ^bufio.Reader,
-) -> (
-	full_move: PGN_Full_Move = {},
-	success: bool = true,
-) {
-	// TODO: this is broken, use parse_pgn_token instead
-	full_move.move_number, success = reader_read_integer(reader)
-	success &= success
-	dot, err := bufio.reader_read_byte(reader)
-	success &= (err == .None)
-	acceptable_delimiters := [?]u8{' ', '\n', '\t'}
-	skip_characters_in_set(reader = reader, chars = acceptable_delimiters)
-	half_move, s := parse_half_move_from_pgn(reader)
-	success &= s
-	// parse move descriptors(+ and #)
-	// NOTE: move descriptors are currently being stripped completely
-	if skip_characters_in_set(reader, [?]u8{'+', '#'}) {
-		fmt.eprintln("skipping a move descriptor")
-	}
-	half_move, s = parse_half_move_from_pgn(reader)
-	success &= s
-	if skip_characters_in_set(reader, [?]u8{'+', '#'}) {
-		fmt.eprintln("skipping a move descriptor")
-	}
-	skip_characters_in_set(reader = reader, chars = acceptable_delimiters)
+// parse_full_move_from_pgn :: proc(
+// 	reader: ^bufio.Reader,
+// ) -> (
+// 	full_move: PGN_Full_Move = {},
+// 	success: bool = true,
+// ) {
+// 	// TODO: this is broken, use parse_pgn_token instead
+// 	full_move.move_number, success = reader_read_integer(reader)
+// 	success &= success
+// 	dot, err := bufio.reader_read_byte(reader)
+// 	success &= (err == .None)
+// 	acceptable_delimiters := [?]u8{' ', '\n', '\t'}
+// 	skip_characters_in_set(reader = reader, chars = acceptable_delimiters)
+// 	half_move, s := parse_half_move_from_pgn(reader)
+// 	success &= s
+// 	// parse move descriptors(+ and #)
+// 	// NOTE: move descriptors are currently being stripped completely
+// 	if skip_characters_in_set(reader, [?]u8{'+', '#'}) {
+// 		fmt.eprintln("skipping a move descriptor")
+// 	}
+// 	half_move, s = parse_half_move_from_pgn(reader)
+// 	success &= s
+// 	if skip_characters_in_set(reader, [?]u8{'+', '#'}) {
+// 		fmt.eprintln("skipping a move descriptor")
+// 	}
+// 	skip_characters_in_set(reader = reader, chars = acceptable_delimiters)
 
-	// game result string
-	skipped_strings := [?]string{"1/2-1/2", "1-0", "0-1"}
-	if skip_characters_in_set_strings_variant(reader, skipped_strings[:]) {
-		fmt.eprintln("Got a game result")
-	}
-	// panic("Oops, you forgot to finish your job.")
+// 	// game result string
+// 	skipped_strings := [?]string{"1/2-1/2", "1-0", "0-1"}
+// 	if skip_characters_in_set_strings_variant(reader, skipped_strings[:]) {
+// 		fmt.eprintln("Got a game result")
+// 	}
+// 	// panic("Oops, you forgot to finish your job.")
 
-	// TODO: annotation parsing
-	// TODO: variation parsing
-	return
-}
+// 	// TODO: annotation parsing
+// 	// TODO: variation parsing
+// 	return
+// }
 PGN_Game :: struct{
 	moves:[]PGN_Half_Move,
 	result:Chess_Result
@@ -214,6 +214,8 @@ PGN_Game :: struct{
 Move_Number :: distinct u16
 PGN_Metadata :: distinct struct{}
 Empty_Line :: distinct struct{}
+
+// VITAL NOTE: the following is coupled together, MAKE SURE they go in the same order.
 PGN_Parser_Token :: union{
 	Move_Number,
 	PGN_Half_Move,
@@ -221,6 +223,14 @@ PGN_Parser_Token :: union{
 	PGN_Metadata,
 	Empty_Line
 }
+PGN_Parser_Token_Type :: enum u16{
+	Move_Number = 1,
+	PGN_Half_Move,
+	Chess_Result,
+	PGN_Metadata,
+	Empty_Line
+}
+
 parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, success:bool){
 	{
 		preview, preview_err := bufio.reader_peek(reader, 5)
@@ -325,11 +335,50 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, succ
 	return
 }
 parse_full_game_from_pgn :: proc(reader:^bufio.Reader) -> (game: PGN_Game, success: bool){
-	delimiters := [?]u8{' ', '\n', '\t'}
+	// delimiters := [?]u8{' ', '\n', '\t'}
 	// unimplemented("Implementation is waiting for tests of parse_pgn_token")
 	// skip_character_in_set(reader, delimiters)
-	fmt.eprintln("Skipping this")
+	// fmt.eprintln("Skipping this")
 
+	// thing:PGN_Parser_Token=Empty_Line{}
+	// fmt.eprintln(thing)
+	// thing=Move_Number{}
+	// fmt.eprintln(thing)
+
+	token_types::bit_set[PGN_Parser_Token_Type]
+	expected:=token_types{.Move_Number}
+	second_half_move:bool
+	for{
+		token, token_read:=parse_pgn_token(reader)
+		if token_read == false{
+			return
+		}
+		tag_ptr:=transmute(^u16)&token
+		tag:=transmute(PGN_Parser_Token_Type)tag_ptr^
+		// FIXME: this is likely what's causing this to error with no success
+		if tag not_in expected{
+			success = false
+			return
+		}
+		switch t in token{
+			case Move_Number:
+				expected=token_types{.PGN_Half_Move}
+			case PGN_Half_Move:
+				if second_half_move{
+					expected=token_types{.Chess_Result, .Move_Number}
+				}else{
+					expected=token_types{.Chess_Result, .PGN_Half_Move}
+					second_half_move=true
+				}
+			case Chess_Result:
+				success = true
+				break
+			case PGN_Metadata:
+				unimplemented()
+			case Empty_Line:
+				unimplemented("Currently only a single game of moves with no metadata can be parsed, so this is redundant for now")
+		}
+	}
 	return
 }
 reader_init_from_string :: proc(
@@ -480,6 +529,15 @@ run_tests :: proc() {
 			_=token.(Chess_Result)
 		}
 		fmt.eprintln("TEST parsing multiple pgn tokens sequentially works")
+		{
+			reader_init_from_string(`1. e4 d5 2. exd5 Qxd5 3. Nc3 Qd8 4. Bc4 Nf6 5. Nf3 Bg4 6. h3 Bxf3 7. Qxf3 e6 8.
+				Qxb7 Nbd7 9. Nb5 Rc8 10. Nxa7 Nb6 11. Nxc8 Nxc8 12. d4 Nd6 13. Bb5+ Nxb5 14.
+				Qxb5+ Nd7 15. d5 exd5 16. Be3 Bd6 17. Rd1 Qf6 18. Rxd5 Qg6 19. Bf4 Bxf4 20.
+				Qxd7+ Kf8 21. Qd8# 1-0`, &string_reader, &r)
+			game, success:=parse_full_game_from_pgn(&r)
+			assert(success==true)
+		}
+		fmt.eprintln("TEST full game parsing successful")
 		// {
 		// 	reader_init_from_string(`1. e4 d5 1/2-1/2ok`, &string_reader, &r)
 		// 	// skip_characters_in_set_strings_variant(&r, skipped_strings[:])
@@ -491,7 +549,6 @@ run_tests :: proc() {
 		// 	assert(ok_maybe == "ok", "test failed")
 		// 	fmt.eprintln("Parsing full moves works")
 		// }
-		fmt.eprintln("TEST of full move parsing successful")
 	}
 	// pgn_test_1(`1. e4 d5`)
 	// fmt.eprintln("test 2 successful")
