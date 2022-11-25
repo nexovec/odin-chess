@@ -251,7 +251,7 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, succ
 		case '\n':
 			bufio.reader_read_byte(reader)
 			c, err := bufio.reader_peek(reader,1)
-			if err==.None && c[1]=='\n'{
+			if err==.None && c[0]=='\n'{
 				bufio.reader_read_byte(reader)
 				result = Empty_Line{}
 				success = true
@@ -334,6 +334,8 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, succ
 		}
 		return
 	}
+	// dbg_str, _ := bufio.reader_peek(reader, 15)
+	// fmt.eprintln("No token", transmute(string)dbg_str)
 	return
 }
 parse_full_game_from_pgn :: proc(reader:^bufio.Reader) -> (game: PGN_Game, success: bool){
@@ -374,6 +376,7 @@ parse_full_game_from_pgn :: proc(reader:^bufio.Reader) -> (game: PGN_Game, succe
 				fmt.eprintln("got a half move")
 				if second_half_move{
 					expected=token_types{.Chess_Result, .Move_Number}
+					second_half_move=false
 				}else{
 					expected=token_types{.Chess_Result, .PGN_Half_Move}
 					second_half_move=true
@@ -542,9 +545,9 @@ run_tests :: proc() {
 		fmt.eprintln("TEST parsing multiple pgn tokens sequentially works")
 		{
 			reader_init_from_string(`1. e4 d5 2. exd5 Qxd5 3. Nc3 Qd8 4. Bc4 Nf6 5. Nf3 Bg4 6. h3 Bxf3 7. Qxf3 e6 8.
-				Qxb7 Nbd7 9. Nb5 Rc8 10. Nxa7 Nb6 11. Nxc8 Nxc8 12. d4 Nd6 13. Bb5+ Nxb5 14.
-				Qxb5+ Nd7 15. d5 exd5 16. Be3 Bd6 17. Rd1 Qf6 18. Rxd5 Qg6 19. Bf4 Bxf4 20.
-				Qxd7+ Kf8 21. Qd8# 1-0`, &string_reader, &r)
+Qxb7 Nbd7 9. Nb5 Rc8 10. Nxa7 Nb6 11. Nxc8 Nxc8 12. d4 Nd6 13. Bb5+ Nxb5 14.
+Qxb5+ Nd7 15. d5 exd5 16. Be3 Bd6 17. Rd1 Qf6 18. Rxd5 Qg6 19. Bf4 Bxf4 20.
+Qxd7+ Kf8 21. Qd8# 1-0`, &string_reader, &r)
 			game, success:=parse_full_game_from_pgn(&r)
 			assert(success==true, fmt.tprintln(game))
 		}
