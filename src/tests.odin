@@ -12,29 +12,42 @@ consume_delimited_move :: proc(
 	move_string_backing_buffer: ^[5]byte,
 ) -> (
 	[]byte,
-	io.Error,
+	bool,
 ) {
 	i := 0
+	// {
+	// 	data,err:=bufio.reader_peek(reader, 7)
+	// 	fmt.eprintln(transmute(string)data, err)
+	// }
 	for i < 6 {
 		c, err := bufio.reader_read_byte(reader)
 		if err == .EOF {
-			return move_string_backing_buffer[:i], .EOF
+			return move_string_backing_buffer[:i], true
 		}
 		if err != .None {
-			return move_string_backing_buffer[:0], err
+			return move_string_backing_buffer[:0], false
 		}
 		switch c {
+		case '[':
+			bufio.reader_unread_byte(reader)
+			return move_string_backing_buffer[:], false
 		case ' ', '\t', '\n', '#', '+', '-', '=':
 			if i==0{
 				break
 			}
 			bufio.reader_unread_byte(reader)
-			return move_string_backing_buffer[:i], .None
+			return move_string_backing_buffer[:i], true
+		}
+		if i==5{
+			fmt.eprintln(err, rune(c))
+			panic("This isn't supposed to happen")
 		}
 		move_string_backing_buffer[i] = c
 		i += 1
 	}
-	return move_string_backing_buffer[:0], .No_Progress
+	// next, _:=bufio.reader_peek(reader, 10)
+	// fmt.eprintln(transmute(string)move_string_backing_buffer[:],"|",transmute(string)next)
+	return move_string_backing_buffer[:0], false
 }
 
 get_piece_type_from_pgn_character :: proc(
@@ -68,8 +81,11 @@ parse_half_move_from_pgn :: proc(
 	success: bool = false,
 ) {
 	buf: [5]byte = {}
-	move_bytes, err := consume_delimited_move(reader, &buf)
-	assert(err == .None || err == .EOF, fmt.tprintln(err))
+	move_bytes, consume_success := consume_delimited_move(reader, &buf)
+	// assert(consume_success, transmute(string)move_bytes)
+	if !consume_success{
+		return
+	}
 	move_string := cast(string)move_bytes
 	// move parsing
 	s: bool
@@ -215,7 +231,10 @@ PGN_Game :: struct{
 	result:Chess_Result
 }
 Move_Number :: distinct u16
-PGN_Metadata :: distinct struct{}
+PGN_Metadata :: distinct struct{
+	key:string,
+	value:string
+}
 Empty_Line :: distinct struct{}
 
 // VITAL NOTE: the following is coupled together, MAKE SURE they go in the same order.
@@ -227,7 +246,8 @@ PGN_Parser_Token :: union{
 	Empty_Line
 }
 PGN_Parser_Token_Type :: enum u16{
-	Move_Number = 1,
+	None,
+	Move_Number,
 	PGN_Half_Move,
 	Chess_Result,
 	PGN_Metadata,
@@ -235,10 +255,6 @@ PGN_Parser_Token_Type :: enum u16{
 }
 
 parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, success:bool){
-	// {
-	// 	preview, preview_err := bufio.reader_peek(reader, 5)
-	// 	fmt.eprintln("Parsing:", preview, preview_err)
-	// }
 	// skip an optional space, return Empty_Line if there's an empty line
 	bytes, err := bufio.reader_peek(reader, 1)
 	if err != .None{
@@ -280,36 +296,21 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, succ
 		}
 	}
 
-	// {
-	// 	preview, preview_err := bufio.reader_peek(reader, 5)
-	// 	fmt.eprintln("Preview:", preview, preview_err)
-	// }
 	// detect move number
 	move_number, read_success := reader_read_integer(reader)
 	if read_success{
 		c, err = bufio.reader_read_byte(reader)
-		// fmt.eprintln("move number", move_number)
 		success = true
 		if err !=.None || c!='.'{
 			success = false
 		}
 		result = cast(Move_Number)move_number
-		// fmt.eprintln("move number:",move_number)
 		return
 	}
 
-	// {
-	// 	preview, preview_err := bufio.reader_peek(reader, 5)
-	// 	fmt.eprintln("Preview 2:", preview, preview_err)
-	// }
 	// detect half moves
 	move, read := parse_half_move_from_pgn(reader)
 	if read{
-		// fmt.eprintln(move)
-		// {
-		// 	preview, preview_err := bufio.reader_peek(reader, 5)
-		// 	fmt.eprintln("Preview 3:", transmute(string)preview, preview_err)
-		// }
 		opt_move_postfix, err_postfix:=bufio.reader_read_byte(reader)
 		result = move
 		success = true
@@ -334,35 +335,174 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, succ
 		}
 		return
 	}
-	// dbg_str, _ := bufio.reader_peek(reader, 15)
-	// fmt.eprintln("No token", transmute(string)dbg_str)
+	// // detect metadata
+	// mdata_reader: strings.Reader
+	// FIXME: I'm pretty sure this can cause buffer overflow
+	// FIXME: this allocates, use bufio.reader_read_slice and store in a dataframe elsewhere
+	// metadata_str, metadata_err := bufio.reader_read_string(reader, '\n')
+	// if metadata_err == .None{
+	// 	{
+	// 		d,_:=bufio.reader_peek(reader,15)
+	// 		fmt.eprintln("Metadata maybe:", transmute(string)d)
+	// 	}
+
+	// 	fmt.eprintln("I am not metadata")
+	// 	// TODO: support utf-8
+	// 	if metadata_str[0]!='['{
+	// 		return
+	// 	}
+
+	// 	index:i64=386
+	// 	for c, inner in metadata_str[1:]{
+	// 		index = i64(inner)
+	// 		if c == ' '{
+	// 			break
+	// 		}
+	// 	}
+
+	// 	// if end of string, then there was no value
+	// 	fmt.eprintln(index)
+	// 	if index == i64(len(metadata_str))-1{
+	// 		return
+	// 	}
+	// 	key_str := metadata_str[1:index]
+	// 	index+=1
+	// 	if index == i64(len(metadata_str))-1{
+	// 		return
+	// 	}
+	// 	if metadata_str[index] != '\"'{
+	// 		return
+	// 	}
+	// 	index+=1
+	// 	if index == i64(len(metadata_str))-1{
+	// 		return
+	// 	}
+	// 	fmt.eprintln("I am metadata")
+	// 	start_val:=index
+	// 	for c, inner in metadata_str[index:]{
+	// 		index=i64(inner)
+	// 		if c == '\"'{
+	// 			break
+	// 		}
+	// 	}
+	// 	if index == i64(len(metadata_str))-1{
+	// 		return
+	// 	}
+	// 	val_str := metadata_str[start_val:index]
+	// 	if metadata_str[len(metadata_str)-1]!=']'{
+	// 		return
+	// 	}
+	// 	return PGN_Metadata{key_str, val_str}, true
+	// }
+
+	// parse metadata
+	b, b_err:=bufio.reader_read_byte(reader)
+	if b!='['{
+		bufio.reader_unread_byte(reader)
+		return
+	}
+	for {
+		key, key_err:=bufio.reader_read_byte(reader)
+		if key_err!=.None{
+			return
+		}
+		if key == ' '{
+			break
+		}
+	}
+	{
+		key, key_err:=bufio.reader_read_byte(reader)
+		if key_err!=.None{
+			return
+		}
+		if key != '\"'{
+			return
+		}
+	}
+	for {
+		key, key_err:=bufio.reader_read_byte(reader)
+		if key_err!=.None{
+			return
+		}
+		if key == '"'{
+			break
+		}
+	}
+	{
+		key, key_err:=bufio.reader_read_byte(reader)
+		if key_err!=.None{
+			return
+		}
+		if key != ']'{
+			return
+		}
+		result = PGN_Metadata{}
+		success = true
+	}
+
+
 	return
 }
-parse_full_game_from_pgn :: proc(reader:^bufio.Reader) -> (game: PGN_Game, success: bool){
-	// delimiters := [?]u8{' ', '\n', '\t'}
-	// unimplemented("Implementation is waiting for tests of parse_pgn_token")
-	// skip_character_in_set(reader, delimiters)
-	// fmt.eprintln("Skipping this")
 
-	// thing:PGN_Parser_Token=Empty_Line{}
-	// fmt.eprintln(thing)
-	// thing=Move_Number{}
-	// fmt.eprintln(thing)
+// parse_metadata_row::proc(reader:^bufio.Reader)->(key:string, value:string, success: bool){
+// 	// assumes '[' has already been consumed
+// 	line,e:=bufio.reader_read_slice(reader, '\n')
+// 	if e!=.None{
+// 		return
+// 	}
+// 	key_len:=0
+// 	key_scan: for seeked_char in line{
+// 		// FIXME: seeked_char could be utf-8 and produce weird behavior
+// 		switch seeked_char{
+// 			case '\"',' ':
+// 				break key_scan
+// 			case '[',']','\n','\t','\'', '\r':
+// 				return
+// 			case:
+// 				key_len+=1
+// 		}
+// 	}
+// 	assert(key_len>0)
+// 	assert(line[key_len+1] == '\"')
+// 	val_start:=key_len+2
+// 	val_len:=0
+// 	val_scan: for seeked_char in line[val_start:]{
+// 		// FIXME: seeked_char could be utf-8 and produce weird behavior
+// 		switch seeked_char{
+// 			case '\"':
+// 				break val_scan
+// 			case '[',']','\n':
+// 				panic("disallowed characters")
+// 			case:
+// 				val_len+=1
+// 		}
+// 	}
+// 	assert(line[val_start+val_len]=='\"')
+// 	assert(line[val_start+val_len+1]==']')
+// 	key=transmute(string)line[:key_len]
+// 	value=transmute(string)line[val_start:val_start+val_len]
+// 	fmt.print("key:",key,"\t")
+// 	fmt.println("value:",value)
+// 	return key, value
+// }
 
+parse_full_game_from_pgn :: proc(reader:^bufio.Reader, no_metadata:bool=false) -> (game: PGN_Game, success: bool){
 	token_types::bit_set[PGN_Parser_Token_Type]
-	expected:=token_types{.Move_Number}
+	expected:=token_types{.PGN_Metadata}
+	if no_metadata{
+		expected=token_types{.Move_Number}
+	}
 	second_half_move:bool
 	for{
 		token, token_read:=parse_pgn_token(reader)
 		if token_read == false{
 			return
 		}
-		// tag_ptr:=transmute(^u16)&token
-		// tag:=transmute(PGN_Parser_Token_Type)tag_ptr^
 		raw_tag:=reflect.get_union_variant_raw_tag(token)
 		tag:=transmute(PGN_Parser_Token_Type)cast(u16)raw_tag
-		// fmt.eprintln("And the tag of the day is:", raw_tag)
-		// FIXME: this is likely what's causing this to error with no success
+		if tag == PGN_Parser_Token_Type.None{
+			panic("This is a bug, report to developer!")
+		}
 		if tag not_in expected{
 			fmt.eprintln("It was this.", tag, expected)
 			success = false
@@ -387,10 +527,12 @@ parse_full_game_from_pgn :: proc(reader:^bufio.Reader) -> (game: PGN_Game, succe
 				break
 			case PGN_Metadata:
 				fmt.eprintln("got metadata")
-				unimplemented()
+				// unimplemented()
+				expected=token_types{.Empty_Line, .PGN_Metadata}
 			case Empty_Line:
 				fmt.eprintln("got a move number")
-				unimplemented("Currently only a single game of moves with no metadata can be parsed, so this is redundant for now")
+				// unimplemented("Currently only a single game of moves with no metadata can be parsed, so this is redundant for now")
+				expected=token_types{.Move_Number}
 		}
 	}
 	return
@@ -548,10 +690,42 @@ run_tests :: proc() {
 Qxb7 Nbd7 9. Nb5 Rc8 10. Nxa7 Nb6 11. Nxc8 Nxc8 12. d4 Nd6 13. Bb5+ Nxb5 14.
 Qxb5+ Nd7 15. d5 exd5 16. Be3 Bd6 17. Rd1 Qf6 18. Rxd5 Qg6 19. Bf4 Bxf4 20.
 Qxd7+ Kf8 21. Qd8# 1-0`, &string_reader, &r)
+			game, success:=parse_full_game_from_pgn(&r, true)
+			assert(success==true, fmt.tprintln(game))
+		}
+		fmt.eprintln("TEST full moves portion parsing successful")
+
+		{
+			pgn_sample_full:=`[Event "Valencia Casual Games"]
+[Site "Valencia"]
+[Date "1475.??.??"]
+[Round "?"]
+[White "De Castellvi, Francisco"]
+[Black "Vinoles, Narcisco"]
+[Result "1-0"]
+[ECO "B01"]
+[PlyCount "41"]
+[EventDate "1475.??.??"]
+[EventType "game"]
+[EventCountry "ESP"]
+[SourceTitle "EXT 2008"]
+[Source "ChessBase"]
+[SourceDate "2007.11.25"]
+[SourceVersion "1"]
+[SourceVersionDate "2007.11.25"]
+[SourceQuality "1"]
+
+1. e4 d5 2. exd5 Qxd5 3. Nc3 Qd8 4. Bc4 Nf6 5. Nf3 Bg4 6. h3 Bxf3 7. Qxf3 e6 8.
+Qxb7 Nbd7 9. Nb5 Rc8 10. Nxa7 Nb6 11. Nxc8 Nxc8 12. d4 Nd6 13. Bb5+ Nxb5 14.
+Qxb5+ Nd7 15. d5 exd5 16. Be3 Bd6 17. Rd1 Qf6 18. Rxd5 Qg6 19. Bf4 Bxf4 20.
+Qxd7+ Kf8 21. Qd8# 1-0`
+			pgn_sample:=`[Event "Valencia Casual Games"]`
+			fmt.eprintln(pgn_sample)
+			reader_init_from_string(pgn_sample, &string_reader, &r)
 			game, success:=parse_full_game_from_pgn(&r)
 			assert(success==true, fmt.tprintln(game))
 		}
-		fmt.eprintln("TEST full game parsing successful")
+		fmt.eprintln("TEST full moves portion parsing successful")
 		// {
 		// 	reader_init_from_string(`1. e4 d5 1/2-1/2ok`, &string_reader, &r)
 		// 	// skip_characters_in_set_strings_variant(&r, skipped_strings[:])
