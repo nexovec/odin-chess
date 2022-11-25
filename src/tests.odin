@@ -1,5 +1,6 @@
 package main
 import bufio "core:bufio"
+import "core:reflect"
 import io "core:io"
 import strings "core:strings"
 import fmt "core:fmt"
@@ -77,7 +78,7 @@ parse_half_move_from_pgn :: proc(
 		return
 	}
 	if len(move_string) == 2 {
-		fmt.eprintln("casual pawn move")
+		// fmt.eprintln("casual pawn move")
 		if move.piece_type != .Pawn {
 			return
 		}
@@ -87,7 +88,7 @@ parse_half_move_from_pgn :: proc(
 		if move.piece_type == .Pawn {
 			return
 		}
-		fmt.eprintln("casual piece move")
+		// fmt.eprintln("casual piece move")
 		move.dest_x = move_string[1]
 		move.dest_y = move_string[2]
 	} else if len(move_string) == 4 {
@@ -108,12 +109,14 @@ parse_half_move_from_pgn :: proc(
 			case '1' ..= '8':
 				move.known_src_row = true
 				move.src_x = move_string[1]
+			case 'x':
+			case:
+				return
 			}
 			move.dest_x = move_string[2]
 			move.dest_y = move_string[3]
 		}
 		fmt.println(move.piece_type, "takes on", rune(move.dest_x), rune(move.dest_y))
-		return
 	} else if len(move_string) == 5 {
 		if move_string[2] != 'x' {
 			return
@@ -129,7 +132,7 @@ parse_half_move_from_pgn :: proc(
 		}
 		move.dest_x = move_string[3]
 		move.dest_y = move_string[4]
-		fmt.println(move.piece_type, "takes on", rune(move.dest_x), rune(move.dest_y))
+		fmt.println(move.piece_type, " long form takes on", rune(move.dest_x), rune(move.dest_y))
 	} else {
 		panic("This is impossible.")
 	}
@@ -163,7 +166,7 @@ reader_read_integer :: proc(reader: ^bufio.Reader) -> (result: u16 = 0, success:
 		// fmt.eprintln(transmute(string)buf[:], len(buf))
 		success = true
 		s:=transmute(string)buf[:]
-		fmt.eprintln("This is a number:", s)
+		// fmt.eprintln("This is a number:", s)
 		result = u16(strconv.atoi(s))
 		assert(result!=0) // TODO: it should work with zero, but not where I'm using it.
 	}
@@ -232,10 +235,10 @@ PGN_Parser_Token_Type :: enum u16{
 }
 
 parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, success:bool){
-	{
-		preview, preview_err := bufio.reader_peek(reader, 5)
-		fmt.eprintln("Parsing:", preview, preview_err)
-	}
+	// {
+	// 	preview, preview_err := bufio.reader_peek(reader, 5)
+	// 	fmt.eprintln("Parsing:", preview, preview_err)
+	// }
 	// skip an optional space, return Empty_Line if there's an empty line
 	bytes, err := bufio.reader_peek(reader, 1)
 	if err != .None{
@@ -277,37 +280,36 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, succ
 		}
 	}
 
-	{
-		preview, preview_err := bufio.reader_peek(reader, 5)
-		fmt.eprintln("Preview:", preview, preview_err)
-	}
+	// {
+	// 	preview, preview_err := bufio.reader_peek(reader, 5)
+	// 	fmt.eprintln("Preview:", preview, preview_err)
+	// }
 	// detect move number
 	move_number, read_success := reader_read_integer(reader)
 	if read_success{
 		c, err = bufio.reader_read_byte(reader)
+		// fmt.eprintln("move number", move_number)
 		success = true
 		if err !=.None || c!='.'{
 			success = false
 		}
 		result = cast(Move_Number)move_number
+		// fmt.eprintln("move number:",move_number)
 		return
 	}
-	else{
-		fmt.eprintln(move_number)
-	}
 
-	{
-		preview, preview_err := bufio.reader_peek(reader, 5)
-		fmt.eprintln("Preview 2:", preview, preview_err)
-	}
+	// {
+	// 	preview, preview_err := bufio.reader_peek(reader, 5)
+	// 	fmt.eprintln("Preview 2:", preview, preview_err)
+	// }
 	// detect half moves
 	move, read := parse_half_move_from_pgn(reader)
 	if read{
 		// fmt.eprintln(move)
-		{
-			preview, preview_err := bufio.reader_peek(reader, 5)
-			fmt.eprintln("Preview 3:", transmute(string)preview, preview_err)
-		}
+		// {
+		// 	preview, preview_err := bufio.reader_peek(reader, 5)
+		// 	fmt.eprintln("Preview 3:", transmute(string)preview, preview_err)
+		// }
 		opt_move_postfix, err_postfix:=bufio.reader_read_byte(reader)
 		result = move
 		success = true
@@ -326,7 +328,7 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, succ
 			case '+', '#':
 				fmt.eprintln("Found a check/mate")
 			case:
-				fmt.eprintln(opt_move_postfix)
+				fmt.eprintln("unknown postfix", opt_move_postfix)
 				success = false
 				return
 		}
@@ -353,17 +355,23 @@ parse_full_game_from_pgn :: proc(reader:^bufio.Reader) -> (game: PGN_Game, succe
 		if token_read == false{
 			return
 		}
-		tag_ptr:=transmute(^u16)&token
-		tag:=transmute(PGN_Parser_Token_Type)tag_ptr^
+		// tag_ptr:=transmute(^u16)&token
+		// tag:=transmute(PGN_Parser_Token_Type)tag_ptr^
+		raw_tag:=reflect.get_union_variant_raw_tag(token)
+		tag:=transmute(PGN_Parser_Token_Type)cast(u16)raw_tag
+		// fmt.eprintln("And the tag of the day is:", raw_tag)
 		// FIXME: this is likely what's causing this to error with no success
 		if tag not_in expected{
+			fmt.eprintln("It was this.", tag, expected)
 			success = false
 			return
 		}
 		switch t in token{
 			case Move_Number:
+				fmt.eprintln("got a move number")
 				expected=token_types{.PGN_Half_Move}
 			case PGN_Half_Move:
+				fmt.eprintln("got a half move")
 				if second_half_move{
 					expected=token_types{.Chess_Result, .Move_Number}
 				}else{
@@ -371,11 +379,14 @@ parse_full_game_from_pgn :: proc(reader:^bufio.Reader) -> (game: PGN_Game, succe
 					second_half_move=true
 				}
 			case Chess_Result:
+				fmt.eprintln("got a chess result")
 				success = true
 				break
 			case PGN_Metadata:
+				fmt.eprintln("got metadata")
 				unimplemented()
 			case Empty_Line:
+				fmt.eprintln("got a move number")
 				unimplemented("Currently only a single game of moves with no metadata can be parsed, so this is redundant for now")
 		}
 	}
@@ -535,7 +546,7 @@ run_tests :: proc() {
 				Qxb5+ Nd7 15. d5 exd5 16. Be3 Bd6 17. Rd1 Qf6 18. Rxd5 Qg6 19. Bf4 Bxf4 20.
 				Qxd7+ Kf8 21. Qd8# 1-0`, &string_reader, &r)
 			game, success:=parse_full_game_from_pgn(&r)
-			assert(success==true)
+			assert(success==true, fmt.tprintln(game))
 		}
 		fmt.eprintln("TEST full game parsing successful")
 		// {
