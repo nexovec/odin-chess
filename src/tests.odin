@@ -1,7 +1,7 @@
 package main
 import bufio "core:bufio"
 import "core:reflect"
-import io "core:io"
+// import io "core:io"
 import strings "core:strings"
 import fmt "core:fmt"
 import "core:strconv"
@@ -206,10 +206,18 @@ PGN_Parser_Token_Type :: enum u16{
 	Empty_Line
 }
 
-parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, success:bool){
+PGN_Parsing_Error :: enum{
+	Unspecified,
+	None,
+	Couldnt_Read,
+	Syntax_Error
+}
+
+parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, e:PGN_Parsing_Error){
 	// skip an optional space, return Empty_Line if there's an empty line
 	bytes, err := bufio.reader_peek(reader, 1)
 	if err != .None{
+		e = .Couldnt_Read
 		return
 	}
 	c := bytes[0]
@@ -222,7 +230,7 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, succ
 			if err==.None && c[0]=='\n'{
 				bufio.reader_read_byte(reader)
 				result = Empty_Line{}
-				success = true
+				e = .None
 				return
 			}
 	}
@@ -236,7 +244,7 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, succ
 			for i:=0; i<len(text); i+=1{
 				bufio.reader_read_byte(reader)
 			}
-			success = true
+			e = .None
 			result = corresponding_val[index_of_result_string]
 			return
 		}
@@ -244,6 +252,7 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, succ
 			continue
 		}
 		else if err != .None{
+			e = .Couldnt_Read
 			return
 		}
 	}
@@ -252,9 +261,9 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, succ
 	move_number, read_success := reader_read_integer(reader)
 	if read_success{
 		c, err = bufio.reader_read_byte(reader)
-		success = true
+		e = .None
 		if err !=.None || c!='.'{
-			success = false
+			e = .Syntax_Error
 		}
 		result = cast(Move_Number)move_number
 		return
@@ -265,12 +274,12 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, succ
 	if read{
 		opt_move_postfix, err_postfix:=bufio.reader_read_byte(reader)
 		result = move
-		success = true
+		e = .None
 		if err_postfix == .EOF{
 			return
 		}
 		else if err_postfix!=.None{
-			success = false
+			e = .Couldnt_Read
 			return
 		}
 		switch opt_move_postfix{
@@ -282,22 +291,23 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, succ
 				fmt.eprintln("Found a check/mate")
 			case:
 				fmt.eprintln("unknown postfix", opt_move_postfix)
-				success = false
+				e = .Syntax_Error
 				return
 		}
 		return
 	}
 
 	// parse metadata
-	b, b_err:=bufio.reader_read_byte(reader)
-	if b!='['{
+	b, _ := bufio.reader_read_byte(reader)
+	if b != '['{
 		bufio.reader_unread_byte(reader)
 		return
 	}
 	key_bytes := make([dynamic]byte, 0)
 	for {
-		c, c_err:=bufio.reader_read_byte(reader)
-		if c_err!=.None{
+		c, c_err := bufio.reader_read_byte(reader)
+		if c_err != .None{
+			e = .Couldnt_Read
 			return
 		}
 		if c == ' '{
@@ -306,18 +316,21 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, succ
 		append(&key_bytes, c)
 	}
 	{
-		c, c_err:=bufio.reader_read_byte(reader)
-		if c_err!=.None{
+		c, c_err := bufio.reader_read_byte(reader)
+		if c_err != .None{
+			e = .Couldnt_Read
 			return
 		}
 		if c != '\"'{
+			e = .Syntax_Error
 			return
 		}
 	}
 	val_bytes := make([dynamic]byte,0)
 	for {
-		c, c_err:=bufio.reader_read_byte(reader)
-		if c_err!=.None{
+		c, c_err := bufio.reader_read_byte(reader)
+		if c_err != .None{
+			e = .Couldnt_Read
 			return
 		}
 		if c == '"'{
@@ -326,21 +339,21 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, succ
 		append(&val_bytes, c)
 	}
 	{
-		c, c_err:=bufio.reader_read_byte(reader)
-		if c_err!=.None{
+		val_c, val_c_err := bufio.reader_read_byte(reader)
+		if val_c_err != .None{
+			e = .Couldnt_Read
 			return
 		}
-		if c != ']'{
+		if val_c != ']'{
+			e = .Syntax_Error
 			return
 		}
 		result = PGN_Metadata{
 			key=transmute(string)key_bytes[:],
 			value=transmute(string)val_bytes[:]
 		}
-		success = true
+			e = .None
 	}
-
-
 	return
 }
 
@@ -368,9 +381,11 @@ parse_full_game_from_pgn :: proc(reader:^bufio.Reader, no_metadata:bool=false) -
 	second_half_move:bool
 	for{
 		token, token_read:=parse_pgn_token(reader)
-		if token_read == false{
+		if token_read != .None{
+			fmt.eprintln("Couldn't read token")
 			break
 		}
+		// fmt.eprintln("Read token:",token)
 		raw_tag:=reflect.get_union_variant_raw_tag(token)
 		tag:=transmute(PGN_Parser_Token_Type)cast(u16)raw_tag
 		if tag == PGN_Parser_Token_Type.None{
@@ -522,8 +537,8 @@ run_tests :: proc() {
 		parse_token_from_string_test::proc(reader:^bufio.Reader, string_reader: ^strings.Reader, thing:string)->PGN_Parser_Token{
 			reader_init_from_string(thing, string_reader, reader)
 			// skip_characters_in_set_strings_variant(&r, skipped_strings[:])
-			token, success := parse_pgn_token(reader)
-			assert(success == true, fmt.tprintln(token))
+			token, err := parse_pgn_token(reader)
+			assert(err == .None, fmt.tprintln(token))
 			fmt.eprintln("Parsing full moves works")
 			return token
 		}
@@ -536,17 +551,17 @@ run_tests :: proc() {
 
 		{
 			reader_init_from_string(`1. e4 d5 1/2-1/2ok`, &string_reader, &r)
-			token, success := parse_pgn_token(&r)
-			assert(success == true, fmt.tprintln(token))
+			token, err := parse_pgn_token(&r)
+			assert(err == .None, fmt.tprintln(token))
 			_=token.(Move_Number)
-			token, success = parse_pgn_token(&r)
-			assert(success == true, fmt.tprintln(token))
+			token, err = parse_pgn_token(&r)
+			assert(err == .None, fmt.tprintln(token))
 			_=token.(PGN_Half_Move)
-			token, success = parse_pgn_token(&r)
-			assert(success == true, fmt.tprintln(token))
+			token, err = parse_pgn_token(&r)
+			assert(err == .None, fmt.tprintln(token))
 			_=token.(PGN_Half_Move)
-			token, success = parse_pgn_token(&r)
-			assert(success == true, fmt.tprintln(token))
+			token, err = parse_pgn_token(&r)
+			assert(err == .None, fmt.tprintln(token))
 			_=token.(Chess_Result)
 			fmt.eprintln("TEST parsing multiple pgn tokens sequentially works")
 		}
@@ -566,12 +581,37 @@ Qxd7+ Kf8 21. Qd8# 1-0`, &string_reader, &r)
 			fmt.eprintln(pgn_sample)
 			reader_init_from_string(pgn_sample, &string_reader, &r)
 			// game, success:=parse_full_game_from_pgn(&r)
-			data, success:=parse_pgn_token(&r)
-			assert(success==true, fmt.tprintln(data))
+			data, err:=parse_pgn_token(&r)
+			assert(err==.None, fmt.tprintln(data))
 			fmt.eprintln("TEST metadata parsing successful")
 		}
-		when true{
-			pgn_sample:=`[Event "Valencia Casual Games"]
+		inputs:=[]string{
+			`[Event "Valencia Casual Games"]
+[Site "Valencia"]
+[Date "1475.??.??"]
+[Round "?"]
+[White "De Castellvi, Francisco"]
+[Black "Vinoles, Narcisco"]
+[Result "1-0"]
+[ECO "B01"]
+[PlyCount "41"]
+[EventDate "1475.??.??"]
+[EventType "game"]
+[EventCountry "ESP"]
+[SourceTitle "EXT 2008"]
+[Source "ChessBase"]
+[SourceDate "2007.11.25"]
+[SourceVersion "1"]
+[SourceVersionDate "2007.11.25"]
+[SourceQuality "1"]
+
+1. e4 d5 2. exd5 Qxd5 3. Nc3 Qd8 4. Bc4 Nf6 5. Nf3 Bg4 6. h3 Bxf3 7. Qxf3 e6 8.
+Qxb7 Nbd7 9. Nb5 Rc8 10. Nxa7 Nb6 11. Nxc8 Nxc8 12. d4 Nd6 13. Bb5+ Nxb5 14.
+Qxb5+ Nd7 15. d5 exd5 16. Be3 Bd6 17. Rd1 Qf6 18. Rxd5 Qg6 19. Bf4 Bxf4 20.
+Qxd7+ Kf8 21. Qd8# 1-0
+
+`,
+`[Event "Valencia Casual Games"]
 [Site "Valencia"]
 [Date "1475.??.??"]
 [Round "?"]
@@ -594,17 +634,19 @@ Qxd7+ Kf8 21. Qd8# 1-0`, &string_reader, &r)
 Qxb7 Nbd7 9. Nb5 Rc8 10. Nxa7 Nb6 11. Nxc8 Nxc8 12. d4 Nd6 13. Bb5+ Nxb5 14.
 Qxb5+ Nd7 15. d5 exd5 16. Be3 Bd6 17. Rd1 Qf6 18. Rxd5 Qg6 19. Bf4 Bxf4 20.
 Qxd7+ Kf8 21. Qd8# 1-0`
-			fmt.eprintln(pgn_sample)
+		}
+		for pgn_sample in inputs{
+			// fmt.eprintln(pgn_sample)
 			reader_init_from_string(pgn_sample, &string_reader, &r)
 			game, success:=parse_full_game_from_pgn(&r)
 			assert(success==true, fmt.tprintln(game))
 			fmt.eprintln(args={"Number of moves:", len(game.moves),"number of metadata entries:", len(game.metadatas)},sep="\t")
-			for i in game.metadatas{
-				fmt.println(i.key, i.value)
-			}
-			for i in game.moves{
-				fmt.println(i.piece_type)
-			}
+			// for i in game.metadatas{
+			// 	fmt.println(i.key, i.value)
+			// }
+			// for i in game.moves{
+			// 	fmt.println(i.piece_type)
+			// }
 			fmt.eprintln("TEST full pgn game parsing successful")
 		}
 	}

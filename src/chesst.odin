@@ -1,25 +1,18 @@
 package main
 
 import "core:fmt"
-// import "core:math"
-// import "core:c/libc"
 import SDL "vendor:sdl2"
-import mu "vendor:microui"
+import mu "libs:microui"
 import SDL_Image "vendor:sdl2/image"
 import os "core:os"
 import io "core:io"
 import bufio "core:bufio"
 import win32 "core:sys/windows"
-import "core:strconv"
 import strings "core:strings"
-// import mem "core:mem"
-// import runtime "core:runtime"
-// import gl "vendor:OpenGL"
 
 Vec2i :: distinct [2]i32
 
 state := struct {
-	// import stb_image "vendor:stb/image"
 	mu_ctx:          mu.Context,
 	log_buf:         [1 << 16]byte,
 	log_buf_len:     int,
@@ -41,6 +34,8 @@ MU_PROPERTIES:= struct{
 }
 cb_image: ^SDL.Surface
 cb_texture: ^SDL.Texture
+
+textures:map[string]^SDL.Texture
 
 main :: proc() {
 	fmt.eprintln("STARTING PROGRAM!")
@@ -125,10 +120,10 @@ main :: proc() {
 	// loading chessboard as image
 	SDL_Image.Init(SDL_Image.INIT_PNG)
 	defer SDL_Image.Quit()
-	assert(os.is_file("assets/chessbcg.png"))
+	assert(os.is_file("assets/chessbcg.png"), "Can't find assets")
 	// cb_image = SDL_Image.Load("assets/chessbcg.bmp")
 	cb_image = SDL_Image.Load("assets/chessbcg.png")
-	// assert(cb_image != nil)
+	assert(cb_image != nil, "Can't load an image")
 
 	// cb_image = SDL.LoadBMP("assets/chessbcg.bmp")
 	if(cb_image==nil){
@@ -136,8 +131,12 @@ main :: proc() {
 	}
 	defer SDL.FreeSurface(cb_image)
 
+	textures = make(map[string]^SDL.Texture)
+	defer delete(textures)
+
 	cb_texture = SDL.CreateTextureFromSurface(renderer, cb_image)
 	defer SDL.DestroyTexture(cb_texture)
+	textures["Chessboard"] = cb_texture
 
 	ctx := &state.mu_ctx
 	mu.init(ctx)
@@ -262,21 +261,25 @@ render :: proc(ctx: ^mu.Context, renderer: ^SDL.Renderer) {
 				renderer,
 				&SDL.Rect{cmd.rect.x, cmd.rect.y, cmd.rect.w, cmd.rect.h},
 			)
+		case ^mu.Command_Image:
+			chosen_texture:=textures[cmd.texture_name]
+			if chosen_texture == nil{
+				panic("Couldn't find texture")
+			}
+			rect:=transmute(SDL.Rect)cmd.rect
+			SDL.RenderCopyEx(
+				renderer,
+				chosen_texture,
+				nil,
+				&rect,
+				0,
+				nil,
+				SDL.RendererFlip.NONE,
+			)
 		case ^mu.Command_Jump:
 			unreachable()
 		}
 	}
-
-	SDL.RenderCopyEx(
-		renderer,
-		cb_texture,
-		nil,
-		&SDL.Rect{500, 200, 100, 100},
-		0,
-		nil,
-		SDL.RendererFlip.NONE,
-	)
-
 	SDL.RenderPresent(renderer)
 }
 
@@ -310,7 +313,7 @@ reset_log :: proc() {
 skip_characters_in_set_strings_variant::proc(reader:^bufio.Reader, skipped_strings:[]string)->(did_consume:bool=false){
 	get_longest_of_strings :: proc(strings:[]string)->(s:string){
 		s=strings[0]
-		for val, key in strings{
+		for val, _ in strings{
 			if len(val)>len(s){
 				s = val
 			}
@@ -318,12 +321,7 @@ skip_characters_in_set_strings_variant::proc(reader:^bufio.Reader, skipped_strin
 		return
 	}
 	s:=get_longest_of_strings(skipped_strings)
-	data, err:=bufio.reader_peek(reader, len(s))
-	// TODO: test if it reads until the end of the stream even if .EOF is returned
-	// i:=0
-	// for err==.EOF && len(s)-i>=0{
-	// 	data, err=bufio.reader_peek(reader, len(s)-i)
-	// }
+	data, _:=bufio.reader_peek(reader, len(s))
 	longest_candidate:string=""
 	for str, str_index in skipped_strings{
 		if len(data)<len(str){
@@ -335,7 +333,7 @@ skip_characters_in_set_strings_variant::proc(reader:^bufio.Reader, skipped_strin
 		}
 	}
 	reader_consume_n_bytes::proc(reader:^bufio.Reader, n:int)->io.Error{
-		for i in 0..<n{
+		for _ in 0..<n{
 			_, err:=bufio.reader_read_byte(reader)
 			if err !=.None{
 				return err
@@ -402,7 +400,6 @@ nav_menu_open_file::proc(filepath:string="data/small.pgn"){
 	reader:bufio.Reader
 	bufio.reader_init(&reader, raw_reader, 1<<16)
 	defer bufio.reader_destroy(&reader)
-	// FIXME: handle CRLF vs LF
 	{
 		_,s,err_BOM := bufio.reader_read_rune(&reader)
 		if err_BOM != .None{
@@ -422,10 +419,12 @@ nav_menu_open_file::proc(filepath:string="data/small.pgn"){
 		if !success{
 			break
 		}
+		thing,_:=bufio.reader_peek(&reader, 15)
+		fmt.eprintln(transmute(string)thing)
 		append(&games, game)
 		token, token_success:= parse_pgn_token(&reader)
-		empty_line, conversion_ok := token.(Empty_Line)
-		if !token_success || !conversion_ok{
+		_, conversion_ok := token.(Empty_Line)
+		if token_success!=.None || !conversion_ok{
 			break
 		}
 	}
@@ -466,6 +465,7 @@ all_windows :: proc(ctx: ^mu.Context) {
 	@(static)
 	opts := mu.Options{.NO_CLOSE}
 	opts_navbar := mu.Options{.NO_CLOSE, .NO_RESIZE, .NO_TITLE}
+
 
 	if mu.window(ctx, "Menu Bar", {0, 0, state.sdl_wsize.x, MU_PROPERTIES.MENU_HEIGHT}, opts_navbar) {
 		w := mu.get_current_container(ctx)
@@ -689,5 +689,11 @@ all_windows :: proc(ctx: ^mu.Context) {
 			mu.draw_rect(ctx, mu.layout_next(ctx), ctx.style.colors[col])
 		}
 	}
-
+	if mu.window(ctx, "Chessboard view", {650, 20, 300, 500}){
+		mu.layout_row(ctx, {30, 200, 30})
+		mu.layout_height(ctx, 200)
+		mu.layout_next(ctx)
+		rect := mu.layout_next(ctx)
+		mu.draw_image(ctx, "Chessboard", rect)
+	}
 }
