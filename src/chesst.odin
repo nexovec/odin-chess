@@ -524,12 +524,6 @@ Piece_Type :: enum u8{
 	Queen,
 	King,
 }
-PGN_Full_Move :: struct{
-	move_number: u16,
-	has_both_halves:bool,
-	first_half:PGN_Half_Move,
-	second_half:PGN_Half_Move,
-}
 PGN_Half_Move :: struct{
 	piece_type:Piece_Type,
 	known_src_row:bool,

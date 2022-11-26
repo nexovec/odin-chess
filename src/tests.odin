@@ -182,10 +182,6 @@ reader_read_integer :: proc(reader: ^bufio.Reader) -> (result: u16 = 0, success:
 	}
 	return
 }
-PGN_Game :: struct{
-	moves:[]PGN_Half_Move,
-	result:Chess_Result
-}
 Move_Number :: distinct u16
 PGN_Metadata :: distinct struct{
 	key:string,
@@ -340,17 +336,33 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, succ
 
 	return
 }
-parse_full_game_from_pgn :: proc(reader:^bufio.Reader, no_metadata:bool=false) -> (game: PGN_Game, success: bool){
+
+PGN_Parsed_Game :: struct{
+	metadatas:[dynamic]PGN_Metadata,
+	moves:[dynamic]PGN_Half_Move,
+	result:Chess_Result
+}
+parse_full_game_from_pgn :: proc(reader:^bufio.Reader, no_metadata:bool=false) -> (game: PGN_Parsed_Game = {}, success: bool){
 	token_types::bit_set[PGN_Parser_Token_Type]
 	expected:=token_types{.PGN_Metadata}
 	if no_metadata{
 		expected=token_types{.Move_Number}
 	}
+	pgn_parsed_game_init :: proc(game: ^PGN_Parsed_Game){
+		game.metadatas=make([dynamic]PGN_Metadata,0)
+		game.moves=make([dynamic]PGN_Half_Move,0)
+		game.result=Chess_Result.Undecided
+	}
+	pgn_parsed_game_destroy :: proc(game: ^PGN_Parsed_Game){
+		delete_dynamic_array(game.metadatas)
+		delete_dynamic_array(game.moves)
+	}
+	pgn_parsed_game_init(&game)
 	second_half_move:bool
 	for{
 		token, token_read:=parse_pgn_token(reader)
 		if token_read == false{
-			return
+			break
 		}
 		raw_tag:=reflect.get_union_variant_raw_tag(token)
 		tag:=transmute(PGN_Parser_Token_Type)cast(u16)raw_tag
@@ -360,7 +372,7 @@ parse_full_game_from_pgn :: proc(reader:^bufio.Reader, no_metadata:bool=false) -
 		if tag not_in expected{
 			fmt.eprintln("It was this.", tag, expected)
 			success = false
-			return
+			break
 		}
 		switch t in token{
 			case Move_Number:
@@ -368,6 +380,7 @@ parse_full_game_from_pgn :: proc(reader:^bufio.Reader, no_metadata:bool=false) -
 				expected=token_types{.PGN_Half_Move}
 			case PGN_Half_Move:
 				fmt.eprintln("got a half move")
+				append(&game.moves, t)
 				if second_half_move{
 					expected=token_types{.Chess_Result, .Move_Number}
 					second_half_move=false
@@ -377,11 +390,13 @@ parse_full_game_from_pgn :: proc(reader:^bufio.Reader, no_metadata:bool=false) -
 				}
 			case Chess_Result:
 				fmt.eprintln("got a chess result")
+				game.result = t
 				success = true
-				break
+				return
 			case PGN_Metadata:
 				fmt.eprintln("got metadata")
 				// unimplemented()
+				append(&game.metadatas,t)
 				expected=token_types{.Empty_Line, .PGN_Metadata}
 			case Empty_Line:
 				fmt.eprintln("got a move number")
@@ -389,6 +404,7 @@ parse_full_game_from_pgn :: proc(reader:^bufio.Reader, no_metadata:bool=false) -
 				expected=token_types{.Move_Number}
 		}
 	}
+	pgn_parsed_game_destroy(&game)
 	return
 }
 reader_init_from_string :: proc(
@@ -552,32 +568,7 @@ Qxd7+ Kf8 21. Qd8# 1-0`, &string_reader, &r)
 			assert(success==true, fmt.tprintln(data))
 			fmt.eprintln("TEST metadata parsing successful")
 		}
-		when false{
-			pgn_sample:=`
-[Site "Valencia"]
-[Date "1475.??.??"]
-[Round "?"]
-[White "De Castellvi, Francisco"]
-[Black "Vinoles, Narcisco"]
-[Result "1-0"]
-[ECO "B01"]
-[PlyCount "41"]
-[EventDate "1475.??.??"]
-[EventType "game"]
-[EventCountry "ESP"]
-[SourceTitle "EXT 2008"]
-[Source "ChessBase"]
-[SourceDate "2007.11.25"]
-[SourceVersion "1"]
-[SourceVersionDate "2007.11.25"]
-[SourceQuality "1"]`
-			fmt.eprintln(pgn_sample)
-			reader_init_from_string(pgn_sample, &string_reader, &r)
-			game, success:=parse_full_game_from_pgn(&r)
-			assert(success==true, fmt.tprintln(game))
-			fmt.eprintln("TEST multiple metadata parsing successful")
-		}
-		when false{
+		when true{
 			pgn_sample:=`[Event "Valencia Casual Games"]
 [Site "Valencia"]
 [Date "1475.??.??"]
@@ -605,6 +596,7 @@ Qxd7+ Kf8 21. Qd8# 1-0`
 			reader_init_from_string(pgn_sample, &string_reader, &r)
 			game, success:=parse_full_game_from_pgn(&r)
 			assert(success==true, fmt.tprintln(game))
+			fmt.eprintln(args={"Number of moves:", len(game.moves),"number of metadata entries:", len(game.metadatas)},sep="\t")
 			fmt.eprintln("TEST full pgn game parsing successful")
 		}
 	}
