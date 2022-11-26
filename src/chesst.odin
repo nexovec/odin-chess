@@ -4,6 +4,7 @@ import "core:fmt"
 import SDL "vendor:sdl2"
 import mu "libs:microui"
 import SDL_Image "vendor:sdl2/image"
+import SDL_ttf "vendor:sdl2/ttf"
 import os "core:os"
 import io "core:io"
 import bufio "core:bufio"
@@ -117,6 +118,13 @@ main :: proc() {
 		return
 	}
 
+	if SDL_ttf.Init() < 0{
+		panic("Couldn't initialize SDL-ttf")
+	}
+	defer SDL_ttf.Quit()
+	basic_font := SDL_ttf.OpenFont("assets/fonts/Cormorant-Regular.ttf", 18)
+	// fmt.eprintln(SDL_ttf.GetError())
+
 	// loading chessboard as image
 	SDL_Image.Init(SDL_Image.INIT_PNG)
 	defer SDL_Image.Quit()
@@ -137,6 +145,8 @@ main :: proc() {
 	cb_texture = SDL.CreateTextureFromSurface(renderer, cb_image)
 	defer SDL.DestroyTexture(cb_texture)
 	textures["Chessboard"] = cb_texture
+
+	// rook_texture = SDL.CreateTexture(renderer, )
 
 	ctx := &state.mu_ctx
 	mu.init(ctx)
@@ -695,5 +705,9 @@ all_windows :: proc(ctx: ^mu.Context) {
 		mu.layout_next(ctx)
 		rect := mu.layout_next(ctx)
 		mu.draw_image(ctx, "Chessboard", rect)
+		if mu.mouse_over(ctx, rect){
+			mu.text(ctx, "Test text")
+			mu.draw_image(ctx, "R", mu.layout_next(ctx))
+		}
 	}
 }

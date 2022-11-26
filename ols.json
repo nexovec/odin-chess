@@ -10,7 +10,7 @@
         },
         {
             "name": "libs",
-            "path": "..\\libs"
+            "path": "libs"
         }
     ],
     "enable_document_symbols": true,
