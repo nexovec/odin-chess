@@ -26,15 +26,17 @@ state := struct {
 	sdl_wsize = Vec2i{960, 540}
 }
 
-MU_PROPERTIES:= struct{
-	STATUS_BAR_HEIGHT:i32,
-	MENU_HEIGHT:i32
+MU_PROPERTIES := struct{
+	STATUS_BAR_HEIGHT: i32,
+	MENU_HEIGHT: i32
 } {
-	STATUS_BAR_HEIGHT=25,
+	STATUS_BAR_HEIGHT = 25,
 	MENU_HEIGHT = 30
 }
 cb_image: ^SDL.Surface
 cb_texture: ^SDL.Texture
+
+basic_font: ^SDL_ttf.Font
 
 textures:map[string]^SDL.Texture
 
@@ -45,13 +47,13 @@ main :: proc() {
 		return
 	}
 	defer SDL.Quit()
-	display_mode:SDL.DisplayMode
-	SDL.GetCurrentDisplayMode(0,&display_mode)
-	refresh_rate:=display_mode.refresh_rate
+	display_mode: SDL.DisplayMode
+	SDL.GetCurrentDisplayMode(0, &display_mode)
+	refresh_rate := display_mode.refresh_rate
 	if refresh_rate == 0 {
-		refresh_rate=60
+		refresh_rate = 60
 	}
-	time_per_tick:i32=1000/refresh_rate
+	time_per_tick:i32 = 1000/refresh_rate
 	window := SDL.CreateWindow(
 		"microui-odin",
 		SDL.WINDOWPOS_UNDEFINED,
@@ -103,6 +105,7 @@ main :: proc() {
 	}
 
 	pixels := make([][4]u8, mu.DEFAULT_ATLAS_WIDTH * mu.DEFAULT_ATLAS_HEIGHT)
+	defer delete(pixels)
 	for alpha, i in mu.default_atlas_alpha {
 		pixels[i].rgb = 0xff
 		pixels[i].a = alpha
@@ -122,8 +125,11 @@ main :: proc() {
 		panic("Couldn't initialize SDL-ttf")
 	}
 	defer SDL_ttf.Quit()
-	basic_font := SDL_ttf.OpenFont("assets/fonts/Cormorant-Regular.ttf", 18)
-	// fmt.eprintln(SDL_ttf.GetError())
+	basic_font = SDL_ttf.OpenFont("assets/fonts/chess_font.ttf", 25)
+	if SDL_ttf.GetError()!=""{
+		panic(fmt.tprintln(SDL_ttf.GetError()))
+	}
+	defer SDL_ttf.CloseFont(basic_font)
 
 	// loading chessboard as image
 	SDL_Image.Init(SDL_Image.INIT_PNG)
@@ -277,6 +283,8 @@ render :: proc(ctx: ^mu.Context, renderer: ^SDL.Renderer) {
 				panic("Couldn't find texture")
 			}
 			rect:=transmute(SDL.Rect)cmd.rect
+			blend_mode:=SDL.BlendMode.BLEND
+			// SDL.SetTextureBlendMode(chosen_texture, blend_mode)
 			SDL.RenderCopyEx(
 				renderer,
 				chosen_texture,
@@ -286,6 +294,32 @@ render :: proc(ctx: ^mu.Context, renderer: ^SDL.Renderer) {
 				nil,
 				SDL.RendererFlip.NONE,
 			)
+			if cmd.texture_name == "Chessboard"{
+				// FIXME: problem with blending or sth
+				text_surf := SDL_ttf.RenderText_Blended(basic_font, "WWWWQWQW", {255, 255, 255, 255.0})
+				// text_surf := SDL_ttf.RenderText_Shaded(basic_font, "QWQWQWQW", {255.0, 255.0, 255.0, 255.0}, {0,0,0,0})
+				// if true do panic(fmt.tprintln(SDL_ttf.MeasureText()))
+				// if true do panic(fmt.tprintln(SDL_ttf.FontHeight(basic_font)))
+				defer SDL.FreeSurface(text_surf)
+				text_texture := SDL.CreateTextureFromSurface(renderer, text_surf)
+				defer SDL.DestroyTexture(text_texture)
+				message_rect:SDL.Rect={}; //create a rect
+				message_rect.x = rect.x
+				message_rect.y=rect.y
+				// SDL.RenderCopyEx(
+				// 	renderer,
+				// 	text_texture,
+				// 	nil,
+				// 	&{0,0, 400, 100},
+				// 	0,
+				// 	{},
+				// 	SDL.RendererFlip.NONE
+				// )
+				SDL.QueryTexture(text_texture, nil, nil, &message_rect.w, &message_rect.h)
+				SDL.SetTextureBlendMode(text_texture, blend_mode)
+				// SDL.RenderCopy(renderer, text_texture, nil, &message_rect)
+				SDL.RenderCopyEx(renderer, text_texture, nil, &message_rect,0,nil,.NONE)
+			}
 		case ^mu.Command_Jump:
 			unreachable()
 		}
