@@ -183,7 +183,7 @@ reader_read_integer :: proc(reader: ^bufio.Reader) -> (result: u16 = 0, success:
 	return
 }
 Move_Number :: distinct u16
-PGN_Metadata :: distinct struct{
+PGN_Metadata :: struct{
 	key:string,
 	value:string
 }
@@ -294,42 +294,49 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, succ
 		bufio.reader_unread_byte(reader)
 		return
 	}
+	key_bytes := make([dynamic]byte, 0)
 	for {
-		key, key_err:=bufio.reader_read_byte(reader)
-		if key_err!=.None{
+		c, c_err:=bufio.reader_read_byte(reader)
+		if c_err!=.None{
 			return
 		}
-		if key == ' '{
+		if c == ' '{
 			break
 		}
+		append(&key_bytes, c)
 	}
 	{
-		key, key_err:=bufio.reader_read_byte(reader)
-		if key_err!=.None{
+		c, c_err:=bufio.reader_read_byte(reader)
+		if c_err!=.None{
 			return
 		}
-		if key != '\"'{
+		if c != '\"'{
 			return
 		}
 	}
+	val_bytes := make([dynamic]byte,0)
 	for {
-		key, key_err:=bufio.reader_read_byte(reader)
-		if key_err!=.None{
+		c, c_err:=bufio.reader_read_byte(reader)
+		if c_err!=.None{
 			return
 		}
-		if key == '"'{
+		if c == '"'{
 			break
 		}
+		append(&val_bytes, c)
 	}
 	{
-		key, key_err:=bufio.reader_read_byte(reader)
-		if key_err!=.None{
+		c, c_err:=bufio.reader_read_byte(reader)
+		if c_err!=.None{
 			return
 		}
-		if key != ']'{
+		if c != ']'{
 			return
 		}
-		result = PGN_Metadata{}
+		result = PGN_Metadata{
+			key=transmute(string)key_bytes[:],
+			value=transmute(string)val_bytes[:]
+		}
 		success = true
 	}
 
@@ -376,10 +383,8 @@ parse_full_game_from_pgn :: proc(reader:^bufio.Reader, no_metadata:bool=false) -
 		}
 		switch t in token{
 			case Move_Number:
-				fmt.eprintln("got a move number")
 				expected=token_types{.PGN_Half_Move}
 			case PGN_Half_Move:
-				fmt.eprintln("got a half move")
 				append(&game.moves, t)
 				if second_half_move{
 					expected=token_types{.Chess_Result, .Move_Number}
@@ -389,17 +394,14 @@ parse_full_game_from_pgn :: proc(reader:^bufio.Reader, no_metadata:bool=false) -
 					second_half_move=true
 				}
 			case Chess_Result:
-				fmt.eprintln("got a chess result")
 				game.result = t
 				success = true
 				return
 			case PGN_Metadata:
-				fmt.eprintln("got metadata")
 				// unimplemented()
 				append(&game.metadatas,t)
 				expected=token_types{.Empty_Line, .PGN_Metadata}
 			case Empty_Line:
-				fmt.eprintln("got a move number")
 				// unimplemented("Currently only a single game of moves with no metadata can be parsed, so this is redundant for now")
 				expected=token_types{.Move_Number}
 		}
@@ -597,6 +599,12 @@ Qxd7+ Kf8 21. Qd8# 1-0`
 			game, success:=parse_full_game_from_pgn(&r)
 			assert(success==true, fmt.tprintln(game))
 			fmt.eprintln(args={"Number of moves:", len(game.moves),"number of metadata entries:", len(game.metadatas)},sep="\t")
+			for i in game.metadatas{
+				fmt.println(i.key, i.value)
+			}
+			for i in game.moves{
+				fmt.println(i.piece_type)
+			}
 			fmt.eprintln("TEST full pgn game parsing successful")
 		}
 	}
