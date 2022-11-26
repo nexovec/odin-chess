@@ -84,7 +84,7 @@ main :: proc() {
 		}
 	}
 
-	renderer := SDL.CreateRenderer(window, backend_idx, {.ACCELERATED, .PRESENTVSYNC})
+	renderer := SDL.CreateRenderer(window, backend_idx, {.ACCELERATED, .PRESENTVSYNC, .TARGETTEXTURE})
 	if renderer == nil {
 		fmt.eprintln("SDL.CreateRenderer:", SDL.GetError())
 		return
@@ -296,7 +296,7 @@ render :: proc(ctx: ^mu.Context, renderer: ^SDL.Renderer) {
 			)
 			if cmd.texture_name == "Chessboard"{
 				// FIXME: problem with blending or sth
-				text_surf := SDL_ttf.RenderText_Blended(basic_font, "WWWWQWQW", {255, 255, 255, 255.0})
+				text_surf := SDL_ttf.RenderText_Blended(basic_font, "QQQQQQQQ", {255, 255, 255, 255.0})
 				// text_surf := SDL_ttf.RenderText_Shaded(basic_font, "QWQWQWQW", {255.0, 255.0, 255.0, 255.0}, {0,0,0,0})
 				// if true do panic(fmt.tprintln(SDL_ttf.MeasureText()))
 				// if true do panic(fmt.tprintln(SDL_ttf.FontHeight(basic_font)))
@@ -417,6 +417,7 @@ skip_characters_in_set :: proc(reader:^bufio.Reader, chars:[$T]u8)->(did_consume
 }
 
 nav_menu_open_file::proc(filepath:string="data/small.pgn"){
+
 	splits := strings.split(filepath,".")
 	extension:=splits[len(splits)-1]
 	if extension != "pgn"{
@@ -472,7 +473,7 @@ nav_menu_open_file::proc(filepath:string="data/small.pgn"){
 			break
 		}
 	}
-	fmt.println("Games loaded:", len(games))
+	write_log(fmt.aprintln("Games loaded:", len(games)))
 }
 
 Chess_Result :: enum u8{
@@ -742,6 +743,17 @@ all_windows :: proc(ctx: ^mu.Context) {
 		if mu.mouse_over(ctx, rect){
 			mu.text(ctx, "Test text")
 			mu.draw_image(ctx, "R", mu.layout_next(ctx))
+		}
+	}
+	if mu.window(ctx, "Open file", {200, 50, 400, 400}){
+		mu.layout_row(ctx, {-1}, -28)
+		mu.begin_panel(ctx, "File listings")
+		mu.end_panel(ctx)
+		mu.layout_row(ctx, {-50,-1})
+		mu.begin_panel(ctx, "File name")
+		mu.end_panel(ctx)
+		if .SUBMIT in mu.button(ctx, "Import"){
+			nav_menu_open_file()
 		}
 	}
 }
