@@ -374,7 +374,7 @@ skip_characters_in_set :: proc(reader:^bufio.Reader, chars:[$T]u8)->(did_consume
 	return
 }
 
-open_file::proc(filepath:string="data/small.pgn"){
+nav_menu_open_file::proc(filepath:string="data/small.pgn"){
 	splits := strings.split(filepath,".")
 	extension:=splits[len(splits)-1]
 	if extension != "pgn"{
@@ -416,97 +416,20 @@ open_file::proc(filepath:string="data/small.pgn"){
 			fmt.println("skipping BOM in PGN file, BOM has length of ", s)
 		}
 	}
-	Chess_Square :: distinct byte
-	Chess_Move :: struct{
-		src: Chess_Square,
-		dest: Chess_Square
-	}
-	Metadata_Column :: struct{
-		key:string,
-		values: [dynamic]string
-	}
-	// FIXME: allocates
-	metadata_table: [dynamic]Metadata_Column = make([dynamic]Metadata_Column, 18, 32)
-	Parsing_Stage :: enum u8{
-		None,
-		Metadata,
-		Moves
-	}
-	parsing_stage: Parsing_Stage=.None
-
-	line_count:=1
+	games := make([dynamic]PGN_Parsed_Game, 0)
 	reader_loop: for {
-		whitespace_runes:=[?]u8{' ', '\n', '\t'}
-		switch parsing_stage{
-			case .None:
-				//skip whitespace
-				skip_characters_in_set(&reader, whitespace_runes)
-				r,s, err_rune := bufio.reader_read_rune(&reader)
-				if err_rune == io.Error.EOF{
-					break
-				}else if err_rune != .None{
-					panic("Error reading file")
-				}
-				if s!=1{
-					panic(fmt.tprintf("PGN syntax error, unexpected multi-byte character at %s:%d", filepath, line_count))
-				}
-				c := u8(r)
-				//decide if moves or metadata
-
-				// TODO: test without conversion
-				// switch r{
-				switch c{
-					case '[':
-						bufio.reader_unread_rune(&reader)
-						parsing_stage=.Metadata
-						continue reader_loop
-					case 'a'..='h', 'R','N','B','K','Q':
-						bufio.reader_unread_rune(&reader)
-						parsing_stage=.Moves
-					case:
-						panic(fmt.tprintf("PGN syntax error at %s:%d", filepath, line_count))
-				}
-			case .Metadata:
-				fmt.println("parsing metadata:")
-				metadata_parsing: for{
-					r,s, err := bufio.reader_read_rune(&reader)
-					if s!=1{
-						panic("unexpected multi-byte character")
-					}
-					switch r{
-						case '[':
-							fmt.println("parsing metadata row")
-							// key, value:=parse_metadata_row(&reader)
-						case '1'..='9':
-							bufio.reader_unread_rune(&reader)
-							parsing_stage=.Moves
-							break metadata_parsing
-						case ' ', '\t', '\n', '\r':
-						case:
-							panic(fmt.tprint(u8(r)))
-					}
-				}
-			case .Moves:
-				fmt.println("parsing moves")
-				//reading full-moves
-				moves_buffer:=make([dynamic]PGN_Half_Move)
-				move:PGN_Half_Move
-				fmt.println(len(moves_buffer))
-				panic("This is not yet implemented")
-			}
+		game, success := parse_full_game_from_pgn(&reader)
+		if !success{
+			break
+		}
+		append(&games, game)
+		token, token_success:= parse_pgn_token(&reader)
+		empty_line, conversion_ok := token.(Empty_Line)
+		if !token_success || !conversion_ok{
+			break
 		}
 	}
-	consume_char :: proc(reader: ^bufio.Reader, seeked_char:byte, error_if_not_found:bool=true)->(found:bool){
-		c, err:=bufio.reader_read_byte(reader)
-	if error_if_not_found==true{
-		assert(err==.None)
-		assert(c==seeked_char)
-	}
-	if c!=seeked_char{
-		bufio.reader_unread_byte(reader)
-		return false
-	}
-	return true
+	fmt.println("Games loaded:", len(games))
 }
 
 Chess_Result :: enum u8{
@@ -565,7 +488,7 @@ all_windows :: proc(ctx: ^mu.Context) {
 				mu.end_popup(ctx)
 			}
 			if .SUBMIT in mu.button(ctx, "Import"){
-				open_file()
+				nav_menu_open_file()
 			}
 			mu.button(ctx, "Export")
 			mu.button(ctx, "Chesst files")
