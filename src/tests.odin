@@ -4,6 +4,7 @@ import "core:reflect"
 // import io "core:io"
 import strings "core:strings"
 import fmt "core:fmt"
+import io "core:io"
 import "core:strconv"
 
 /* reads a delimited move(without annotations) from the string, doesn't consume the delimiter, result is NULL terminated*/
@@ -255,25 +256,36 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, e:PG
 	}
 	result_strings := []string{"1-0", "0-1", "1/2-1/2"}
 	corresponding_val := []Chess_Result{.White_Won, .Black_Won, .Draw}
-	// detect results
-	for result_string, index_of_result_string in result_strings{
-		bytes, err := bufio.reader_peek(reader, len(result_string))
-		text := transmute(string)bytes
-		if text == result_string{
-			for i:=0; i<len(text); i+=1{
-				bufio.reader_read_byte(reader)
+
+	reader_startswith :: proc(reader: ^bufio.Reader, compared_strings:[]string) -> (index_of_match:int, success:bool){
+		// detect results
+		for result_string, index_of_result_string in compared_strings{
+			bytes, err := bufio.reader_peek(reader, len(result_string))
+			text := transmute(string)bytes
+			if text == result_string{
+				for i:=0; i<len(text); i+=1{
+					bufio.reader_read_byte(reader)
+				}
+				success = true
+				// result = corresponding_val[index_of_result_string]
+				index_of_match = index_of_result_string
+				return
 			}
-			e = .None
-			result = corresponding_val[index_of_result_string]
-			return
+			if err==.EOF{
+				continue
+			}
+			else if err != .None{
+				return
+			}
 		}
-		if err==.EOF{
-			continue
-		}
-		else if err != .None{
-			e = .Couldnt_Read
-			return
-		}
+		return
+	}
+
+	i, s := reader_startswith(reader, result_strings)
+	if s{
+		e = .None
+		result = corresponding_val[i]
+		return
 	}
 
 	// detect move number

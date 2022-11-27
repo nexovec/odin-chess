@@ -474,7 +474,6 @@ nav_menu_open_file::proc(filepath:string="data/small.pgn"){
 	reader_loop: for {
 		game, success := parse_full_game_from_pgn(&reader)
 		if !success{
-			fmt.eprintln("UHOH")
 			break
 		}
 		thing,_:=bufio.reader_peek(&reader, 15)
