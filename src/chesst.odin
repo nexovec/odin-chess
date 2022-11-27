@@ -135,12 +135,8 @@ main :: proc() {
 	SDL_Image.Init(SDL_Image.InitFlags{.JPG, .PNG})
 	defer SDL_Image.Quit()
 	assert(os.is_file("assets/chessbcg.png"), "Can't find assets")
-	cb_image = SDL_Image.Load("assets/chessbcg.bmp")
-	// cb_image = SDL_Image.Load("assets/chessbcg.png")
-	// cb_image = SDL_Image.Load("assets/jackie.jpg")
-	// assert(cb_image != nil, "Can't load an image")
+	cb_image = SDL_Image.Load("assets/chessbcg.png")
 
-	// cb_image = SDL.LoadBMP("assets/chessbcg.bmp")
 	if(cb_image==nil){
 		panic(fmt.tprint(SDL.GetError()))
 	}
@@ -156,7 +152,7 @@ main :: proc() {
 	defer SDL.DestroyTexture(cb_texture)
 	textures["Chessboard"] = cb_texture
 
-	text_surf := SDL_ttf.RenderText_Blended(basic_font, "wwwwwwww", {20, 20, 20, 255.0})
+	text_surf := SDL_ttf.RenderText_Blended(basic_font, "otjnwl", {20, 20, 20, 255.0})
 	if text_surf == nil{
 		panic("Couldn't render from font")
 	}
@@ -169,31 +165,21 @@ main :: proc() {
 	access:i32
 	w, h:i32
 	SDL.QueryTexture(text_texture, &format, &access, &w, &h)
-	// pieces_texture := SDL.CreateTextureFromSurface(renderer, text_surf)
-	pieces_texture := SDL.CreateTexture(renderer, format, SDL.TextureAccess.TARGET, 200, 400)
-	// pieces_texture := SDL.CreateTexture(renderer, format, transmute(SDL.TextureAccess)access, w, h)
+	pieces_texture := SDL.CreateTexture(renderer, format, SDL.TextureAccess.TARGET, 265, 400)
 	if pieces_texture == nil{
 		panic("Couldn't create textures from surface")
 	}
 	defer SDL.DestroyTexture(pieces_texture)
 
 	// drawing pieces
-	// FIXME:
 	SDL.SetTextureBlendMode(pieces_texture,  SDL.BlendMode.BLEND)
 	SDL.SetRenderTarget(renderer, pieces_texture)
-	// SDL.SetRenderDrawBlendMode(renderer, SDL.BlendMode.NONE)
 	SDL.SetRenderDrawColor(renderer, 255, 255, 255, 0)
-	// SDL.SetRenderDrawBlendMode(renderer, SDL.BlendMode.BLEND)
-	// SDL.SetTextureAlphaMod(text_texture, 255)
 	SDL.RenderClear(renderer)
-	// SDL.RenderFillRect(renderer, nil)
-	src_rect := SDL.Rect{0,0, 200, 50}
 	dst_rect := SDL.Rect{0,0, 200, 50}
 	SDL.RenderCopy(renderer, text_texture, nil, &dst_rect)
 	SDL.SetRenderTarget(renderer, nil)
-	// SDL.SetTextureBlendMode(pieces_texture,  SDL.BlendMode.NONE)
 	textures["Pieces"]=pieces_texture
-	// textures["Pieces"]=text_texture
 
 	ctx := &state.mu_ctx
 	mu.init(ctx)
@@ -206,7 +192,7 @@ main :: proc() {
 		run_tests()
 	}
 	main_loop: for {
-		for e: SDL.Event; SDL.PollEvent(&e);  /**/{
+		for e: SDL.Event; SDL.PollEvent(&e);{
 			#partial switch e.type {
 			case .QUIT:
 				break main_loop
@@ -341,32 +327,6 @@ render :: proc(ctx: ^mu.Context, renderer: ^SDL.Renderer) {
 				nil,
 				SDL.RendererFlip.NONE,
 			)
-			// if cmd.texture_name == "Chessboard"{
-			// 	// FIXME: problem with blending or sth
-			// 	text_surf := SDL_ttf.RenderText_Blended(basic_font, "qqqqqqqq", {20, 20, 20, 255.0})
-			// 	// text_surf := SDL_ttf.RenderText_Shaded(basic_font, "QWQWQWQW", {255.0, 255.0, 255.0, 255.0}, {0,0,0,0})
-			// 	// if true do panic(fmt.tprintln(SDL_ttf.MeasureText()))
-			// 	// if true do panic(fmt.tprintln(SDL_ttf.FontHeight(basic_font)))
-			// 	defer SDL.FreeSurface(text_surf)
-			// 	text_texture := SDL.CreateTextureFromSurface(renderer, text_surf)
-			// 	defer SDL.DestroyTexture(text_texture)
-			// 	message_rect:SDL.Rect={}; //create a rect
-			// 	message_rect.x = rect.x
-			// 	message_rect.y=rect.y
-			// 	// SDL.RenderCopyEx(
-			// 	// 	renderer,
-			// 	// 	text_texture,
-			// 	// 	nil,
-			// 	// 	&{0,0, 400, 100},
-			// 	// 	0,
-			// 	// 	{},
-			// 	// 	SDL.RendererFlip.NONE
-			// 	// )
-			// 	SDL.QueryTexture(text_texture, nil, nil, &message_rect.w, &message_rect.h)
-			// 	// SDL.SetTextureBlendMode(text_texture, blend_mode)
-			// 	// SDL.RenderCopy(renderer, text_texture, nil, &message_rect)
-			// 	SDL.RenderCopyEx(renderer, text_texture, nil, &message_rect,0,nil,.NONE)
-			// }
 		case ^mu.Command_Jump:
 			unreachable()
 		}
