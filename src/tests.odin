@@ -31,7 +31,7 @@ consume_delimited_move :: proc(
 		case '[':
 			bufio.reader_unread_byte(reader)
 			return move_string_backing_buffer[:], false
-		case ' ', '\t', '\n', '#', '+', '-', '=':
+		case ' ', '\t', '\r', '\n', '#', '+', '-', '=':
 			if i==0{
 				break
 			}
@@ -130,7 +130,7 @@ parse_half_move_from_pgn :: proc(
 			move.dest_x = move_string[2]
 			move.dest_y = move_string[3]
 		}
-		fmt.println(move.piece_type, "takes on", rune(move.dest_x), rune(move.dest_y))
+		// fmt.println(move.piece_type, "takes on", rune(move.dest_x), rune(move.dest_y))
 	} else if len(move_string) == 5 {
 		if move_string[2] != 'x' {
 			return
@@ -145,7 +145,7 @@ parse_half_move_from_pgn :: proc(
 		}
 		move.dest_x = move_string[3]
 		move.dest_y = move_string[4]
-		fmt.println(move.piece_type, " long form takes on", rune(move.dest_x), rune(move.dest_y))
+		// fmt.println(move.piece_type, " long form takes on", rune(move.dest_x), rune(move.dest_y))
 	} else {
 		panic("This is impossible.")
 	}
@@ -221,17 +221,36 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, e:PG
 		return
 	}
 	c := bytes[0]
+	if c == '\r'{
+		bufio.reader_read_byte(reader)
+		result, e = parse_pgn_token(reader)
+		return
+	}
 	switch c{
 		case ' ':
 			bufio.reader_read_byte(reader)
 		case '\n':
 			bufio.reader_read_byte(reader)
-			c, err := bufio.reader_peek(reader,1)
-			if err==.None && c[0]=='\n'{
-				bufio.reader_read_byte(reader)
-				result = Empty_Line{}
-				e = .None
-				return
+			l, err := bufio.reader_peek(reader,1)
+
+			if err == .None{
+				counter:=0
+				if l[counter] == '\r'{
+					l, err = bufio.reader_peek(reader, 2)
+					if err!=.None{
+						return
+					}
+					counter+=1
+				}
+				if l[counter] == '\n'{
+					counter+=1
+					for ;counter!=0;counter-=1{
+						bufio.reader_read_byte(reader)
+					}
+					result = Empty_Line{}
+					e = .None
+					return
+				}
 			}
 	}
 	result_strings := []string{"1-0", "0-1", "1/2-1/2"}
@@ -283,14 +302,17 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, e:PG
 			return
 		}
 		switch opt_move_postfix{
+			case '\r':
+				// fmt.eprintln("There it goes")
+				fallthrough
 			case ' ', '\n', '\t':
 				bufio.reader_unread_byte(reader)
 			case '{', '(':
 				panic("Found a variant/commentary")
 			case '+', '#':
-				fmt.eprintln("Found a check/mate")
+				// fmt.eprintln("Found a check/mate")
 			case:
-				fmt.eprintln("unknown postfix", opt_move_postfix)
+				// fmt.eprintln("unknown postfix", opt_move_postfix)
 				e = .Syntax_Error
 				return
 		}
@@ -303,6 +325,7 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, e:PG
 		bufio.reader_unread_byte(reader)
 		return
 	}
+	// fmt.eprintln("parsing metadata")
 	key_bytes := make([dynamic]byte, 0)
 	for {
 		c, c_err := bufio.reader_read_byte(reader)
@@ -380,12 +403,16 @@ parse_full_game_from_pgn :: proc(reader:^bufio.Reader, no_metadata:bool=false) -
 	pgn_parsed_game_init(&game)
 	second_half_move:bool
 	for{
+		// {
+		// 	bytes, _ := bufio.reader_peek(reader, 40)
+		// 	fmt.eprintln(transmute(string) bytes)
+		// }
 		token, token_read:=parse_pgn_token(reader)
 		if token_read != .None{
-			fmt.eprintln("Couldn't read token")
+			fmt.eprintln("Couldn't read token,", token_read)
 			break
 		}
-		// fmt.eprintln("Read token:",token)
+		fmt.eprintln(token)
 		raw_tag:=reflect.get_union_variant_raw_tag(token)
 		tag:=transmute(PGN_Parser_Token_Type)cast(u16)raw_tag
 		if tag == PGN_Parser_Token_Type.None{
@@ -396,6 +423,7 @@ parse_full_game_from_pgn :: proc(reader:^bufio.Reader, no_metadata:bool=false) -
 			success = false
 			break
 		}
+		// fmt.eprintln(token)
 		switch t in token{
 			case Move_Number:
 				expected=token_types{.PGN_Half_Move}
@@ -421,7 +449,7 @@ parse_full_game_from_pgn :: proc(reader:^bufio.Reader, no_metadata:bool=false) -
 				expected=token_types{.Move_Number}
 		}
 	}
-	pgn_parsed_game_destroy(&game)
+	// pgn_parsed_game_destroy(&game)
 	return
 }
 reader_init_from_string :: proc(

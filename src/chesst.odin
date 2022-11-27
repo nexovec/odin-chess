@@ -466,17 +466,23 @@ nav_menu_open_file::proc(filepath:string="data/small.pgn"){
 		}
 	}
 	games := make([dynamic]PGN_Parsed_Game, 0)
+	// game, success := parse_full_game_from_pgn(&reader)
+	// if !success{
+	// 	things,_:=bufio.reader_peek(&reader, 30)
+	// 	fmt.eprintln(transmute(string)things)
+	// }
 	reader_loop: for {
 		game, success := parse_full_game_from_pgn(&reader)
 		if !success{
+			fmt.eprintln("UHOH")
 			break
 		}
 		thing,_:=bufio.reader_peek(&reader, 15)
-		fmt.eprintln(transmute(string)thing)
+		fmt.eprintln("I have loaded a game, next bytes:",transmute(string)thing)
 		append(&games, game)
-		token, token_success:= parse_pgn_token(&reader)
+		token, token_success := parse_pgn_token(&reader)
 		_, conversion_ok := token.(Empty_Line)
-		if token_success!=.None || !conversion_ok{
+		if token_success != .None || !conversion_ok{
 			break
 		}
 	}
