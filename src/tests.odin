@@ -214,6 +214,31 @@ PGN_Parsing_Error :: enum{
 	Syntax_Error
 }
 
+// NOTE: it consumes the thing if it contains the thing. It returns the first match.
+reader_startswith :: proc(reader: ^bufio.Reader, compared_strings:[]string) -> (index_of_match:int, success:bool){
+	// detect results
+
+	for result_string, index_of_result_string in compared_strings{
+		bytes, err := bufio.reader_peek(reader, len(result_string))
+		text := transmute(string)bytes
+		if text == result_string{
+			for i:=0; i<len(text); i+=1{
+				bufio.reader_read_byte(reader)
+			}
+			success = true
+			index_of_match = index_of_result_string
+			return
+		}
+		if err==.EOF{
+			continue
+		}
+		else if err != .None{
+			return
+		}
+	}
+	return
+}
+
 parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, e:PGN_Parsing_Error){
 	// skip an optional space, return Empty_Line if there's an empty line
 	bytes, err := bufio.reader_peek(reader, 1)
@@ -256,30 +281,6 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, e:PG
 	}
 	result_strings := []string{"1-0", "0-1", "1/2-1/2"}
 	corresponding_val := []Chess_Result{.White_Won, .Black_Won, .Draw}
-
-	reader_startswith :: proc(reader: ^bufio.Reader, compared_strings:[]string) -> (index_of_match:int, success:bool){
-		// detect results
-		for result_string, index_of_result_string in compared_strings{
-			bytes, err := bufio.reader_peek(reader, len(result_string))
-			text := transmute(string)bytes
-			if text == result_string{
-				for i:=0; i<len(text); i+=1{
-					bufio.reader_read_byte(reader)
-				}
-				success = true
-				// result = corresponding_val[index_of_result_string]
-				index_of_match = index_of_result_string
-				return
-			}
-			if err==.EOF{
-				continue
-			}
-			else if err != .None{
-				return
-			}
-		}
-		return
-	}
 
 	i, s := reader_startswith(reader, result_strings)
 	if s{
@@ -424,7 +425,7 @@ parse_full_game_from_pgn :: proc(reader:^bufio.Reader, no_metadata:bool=false) -
 			fmt.eprintln("Couldn't read token,", token_read)
 			break
 		}
-		fmt.eprintln(token)
+		// fmt.eprintln(token)
 		raw_tag:=reflect.get_union_variant_raw_tag(token)
 		tag:=transmute(PGN_Parser_Token_Type)cast(u16)raw_tag
 		if tag == PGN_Parser_Token_Type.None{

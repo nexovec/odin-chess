@@ -134,8 +134,8 @@ main :: proc() {
 	// loading chessboard as image
 	SDL_Image.Init(SDL_Image.InitFlags{.JPG, .PNG})
 	defer SDL_Image.Quit()
-	assert(os.is_file("assets/chessbcg.png"), "Can't find assets")
-	cb_image = SDL_Image.Load("assets/chessbcg.png")
+	assert(os.is_file("assets/chessbcg.jpeg"), "Can't find assets")
+	cb_image = SDL_Image.Load("assets/chessbcg.jpeg")
 
 	if(cb_image==nil){
 		panic(fmt.tprint(SDL.GetError()))
@@ -165,10 +165,12 @@ main :: proc() {
 	access:i32
 	w, h:i32
 	SDL.QueryTexture(text_texture, &format, &access, &w, &h)
-	pieces_texture := SDL.CreateTexture(renderer, format, SDL.TextureAccess.TARGET, 265, 400)
+	pieces_texture := SDL.CreateTexture(renderer, format, SDL.TextureAccess.TARGET, 1024, 1024)
 	if pieces_texture == nil{
 		panic("Couldn't create textures from surface")
 	}
+	SDL.QueryTexture(pieces_texture, &format, &access, &w, &h)
+	// fmt.eprintln("sizes:", w, h)
 	defer SDL.DestroyTexture(pieces_texture)
 
 	// drawing pieces
@@ -176,8 +178,9 @@ main :: proc() {
 	SDL.SetRenderTarget(renderer, pieces_texture)
 	SDL.SetRenderDrawColor(renderer, 255, 255, 255, 0)
 	SDL.RenderClear(renderer)
-	dst_rect := SDL.Rect{0,0, 200, 50}
-	SDL.RenderCopy(renderer, text_texture, nil, &dst_rect)
+	src_rect := SDL.Rect{25 * i32(Piece_Type.Knight), 0, 25, 25}
+	dst_rect := SDL.Rect{0,0, 128, 128}
+	SDL.RenderCopy(renderer, text_texture, &src_rect, &dst_rect)
 	SDL.SetRenderTarget(renderer, nil)
 	textures["Pieces"]=pieces_texture
 
