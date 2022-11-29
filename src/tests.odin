@@ -32,7 +32,7 @@ consume_delimited_move :: proc(
 		case '[':
 			bufio.reader_unread_byte(reader)
 			return move_string_backing_buffer[:], false
-		case ' ', '\t', '\r', '\n', '#', '+', '-', '=':
+		case ' ', '\t', '\r', '\n', '#', '+', '{', '(':
 			if i==0{
 				break
 			}
@@ -86,6 +86,18 @@ parse_half_move_from_pgn :: proc(
 		return
 	}
 	move_string := cast(string)move_bytes
+
+	// castling
+	if move_string == "O-O-O"{
+		move.is_qside_castles = true
+	}else if move_string == "O-O"{
+		move.is_kside_castles = true
+	}
+	if move.is_kside_castles || move.is_qside_castles{
+		success = true
+		return
+	}
+
 	// move parsing
 	s: bool
 	move.piece_type, s = get_piece_type_from_pgn_character(move_bytes[0])
@@ -491,19 +503,39 @@ run_tests :: proc() {
 		}
 		{
 			reader_init_from_string(`Rd4`, &string_reader, &r)
-			parse_half_move_from_pgn(&r)
+			thing, success := parse_half_move_from_pgn(&r)
+			assert(success)
+			assert(thing.piece_type == .Rook)
 		}
 		{
 			reader_init_from_string(`Rbe4`, &string_reader, &r)
-			parse_half_move_from_pgn(&r)
+			thing, success := parse_half_move_from_pgn(&r)
+			assert(success)
+			assert(thing.piece_type == .Rook)
 		}
 		{
 			reader_init_from_string(`exd4`, &string_reader, &r)
-			parse_half_move_from_pgn(&r)
+			thing, success := parse_half_move_from_pgn(&r)
+			assert(success)
+			assert(thing.piece_type == .Pawn)
 		}
 		{
 			reader_init_from_string(`Rbxe4`, &string_reader, &r)
-			parse_half_move_from_pgn(&r)
+			thing, success := parse_half_move_from_pgn(&r)
+			assert(success)
+			assert(thing.piece_type == .Rook)
+		}
+		{
+			reader_init_from_string(`O-O-O`, &string_reader, &r)
+			thing, success := parse_half_move_from_pgn(&r)
+			assert(success)
+			assert(thing.is_qside_castles)
+		}
+		{
+			reader_init_from_string(`O-O`, &string_reader, &r)
+			thing, success := parse_half_move_from_pgn(&r)
+			assert(success)
+			assert(thing.is_kside_castles)
 		}
 		fmt.eprintln("TEST of pgn half move parsing successful")
 	}
