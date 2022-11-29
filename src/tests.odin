@@ -334,8 +334,11 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, e:PG
 				bufio.reader_unread_byte(reader)
 			case '{', '(':
 				panic("Found a variant/commentary")
-			case '+', '#':
+			case '+':
+				move.is_check = true
 				// fmt.eprintln("Found a check/mate")
+			case '#':
+				move.is_mate = true
 			case:
 				// fmt.eprintln("unknown postfix", opt_move_postfix)
 				e = .Syntax_Error
