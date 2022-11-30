@@ -164,35 +164,54 @@ main :: proc() {
 	defer SDL.DestroyTexture(cb_texture)
 	textures["Chessboard"] = cb_texture
 
-	piece_atlas_surf := SDL_ttf.RenderText_Blended(basic_font, " otjnwl", {20, 20, 20, 255.0})
-	if piece_atlas_surf == nil{
-		panic("Couldn't render from font")
-	}
-	defer SDL.FreeSurface(piece_atlas_surf)
-	piece_atlas_tex := SDL.CreateTextureFromSurface(renderer, piece_atlas_surf)
-	if piece_atlas_tex == nil{
-		panic("Couldn't create texture from text surface")
-	}
-	defer SDL.DestroyTexture(piece_atlas_tex)
-	textures["PiecesAtlas"] = piece_atlas_tex
-
 	format:u32
 	access:i32
 	w, h:i32
-	SDL.QueryTexture(piece_atlas_tex, &format, &access, &w, &h)
+	{
+		piece_atlas_surf := SDL_ttf.RenderText_Blended(basic_font, " otjnwl", {20, 20, 20, 255})
+		if piece_atlas_surf == nil{
+			panic("Couldn't render from font")
+		}
+		defer SDL.FreeSurface(piece_atlas_surf)
+		white_pieces_atlas := SDL.CreateTextureFromSurface(renderer, piece_atlas_surf)
+		if white_pieces_atlas == nil{
+			panic("Couldn't create texture from white pieces surface")
+		}
+		defer SDL.DestroyTexture(white_pieces_atlas)
+		SDL.QueryTexture(white_pieces_atlas, &format, &access, &w, &h)
+
+		black_pieces_surf := SDL_ttf.RenderText_Blended(basic_font, " otjnwl", {200, 200, 200, 255})
+		if black_pieces_surf == nil{
+			panic("Couldn't render from font")
+		}
+		defer SDL.FreeSurface(black_pieces_surf)
+		black_pieces_atlas := SDL.CreateTextureFromSurface(renderer, black_pieces_surf)
+		if black_pieces_atlas == nil{
+			panic("Couldn't create texture from black pieces surface")
+		}
+		defer SDL.DestroyTexture(black_pieces_atlas)
+		piece_atlas := SDL.CreateTexture(renderer, u32(SDL.PixelFormatEnum.ARGB8888), SDL.TextureAccess.TARGET, w, h*2)
+		textures["PiecesAtlas"] = piece_atlas
+		SDL.SetRenderTarget(renderer, piece_atlas)
+		SDL.RenderClear(renderer)
+		SDL.RenderCopy(renderer, black_pieces_atlas, nil, &{0, 0, w, h})
+		SDL.QueryTexture(black_pieces_atlas, &format, &access, &w, &h)
+		SDL.RenderCopy(renderer, white_pieces_atlas, nil, &{0, 0, w, h})
+		SDL.SetRenderTarget(renderer, nil)
+	}
 	cb_pieces_overlay_size:i32 = state.ui_ctx.chessboard_resolution
-	pieces_texture := SDL.CreateTexture(renderer, format, SDL.TextureAccess.TARGET, cb_pieces_overlay_size, cb_pieces_overlay_size)
-	if pieces_texture == nil{
+	pieces_overlay_tex := SDL.CreateTexture(renderer, format, SDL.TextureAccess.TARGET, cb_pieces_overlay_size, cb_pieces_overlay_size)
+	if pieces_overlay_tex == nil{
 		panic("Couldn't create textures from surface")
 	}
-	SDL.QueryTexture(pieces_texture, &format, &access, &w, &h)
+	SDL.QueryTexture(pieces_overlay_tex, &format, &access, &w, &h)
 	assert(cb_pieces_overlay_size % state.ui_ctx.piece_resolution == 0)
-	defer SDL.DestroyTexture(pieces_texture)
+	defer SDL.DestroyTexture(pieces_overlay_tex)
 
 	// drawing pieces
-	SDL.SetTextureBlendMode(pieces_texture,  SDL.BlendMode.BLEND)
-	textures["Pieces"]=pieces_texture
-	SDL.SetRenderTarget(renderer, pieces_texture)
+	SDL.SetTextureBlendMode(pieces_overlay_tex,  SDL.BlendMode.BLEND)
+	textures["Pieces"]=pieces_overlay_tex
+	SDL.SetRenderTarget(renderer, pieces_overlay_tex)
 	SDL.SetRenderDrawColor(renderer, 255, 255, 255, 0)
 	SDL.RenderClear(renderer)
 	render_piece :: proc(renderer: ^SDL.Renderer, piece_type: Piece_Type, pos:Vec2i){
@@ -204,6 +223,20 @@ main :: proc() {
 		SDL.RenderCopy(renderer, piece_atlas, &src_rect, &dst_rect)
 	}
 	render_piece(renderer, Piece_Type.Bishop, Vec2i{1,2})
+	// render_starting_position :: proc(renderer: ^SDL.Renderer){
+	// 	SDL.RenderClear(renderer)
+	// 	y_rank:i32 = 7
+	// 	color := Piece_Color.White
+	// 	render_piece(renderer, Piece_Type.Rook, color, Vec2i{0,y_rank})
+	// 	render_piece(renderer, Piece_Type.Rook, color, Vec2i{7,y_rank})
+	// 	render_piece(renderer, Piece_Type.Knight, color, Vec2i{1,y_rank})
+	// 	render_piece(renderer, Piece_Type.Knight, color, Vec2i{6,y_rank})
+	// 	render_piece(renderer, Piece_Type.Bishop, color, Vec2i{5,y_rank})
+	// 	render_piece(renderer, Piece_Type.Bishop, color, Vec2i{2,y_rank})
+	// 	render_piece(renderer, Piece_Type.Queen, color, Vec2i{3,y_rank})
+	// 	render_piece(renderer, Piece_Type.King, color, Vec2i{4,y_rank})
+	// }
+	// render_starting_position(renderer)
 	SDL.SetRenderTarget(renderer, nil)
 
 	ctx := &state.mu_ctx
