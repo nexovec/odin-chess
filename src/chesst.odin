@@ -48,7 +48,7 @@ MU_PROPERTIES := struct{
 cb_image: ^SDL.Surface
 cb_texture: ^SDL.Texture
 
-basic_font: ^SDL_ttf.Font
+chess_font: ^SDL_ttf.Font
 
 textures:map[string]^SDL.Texture
 
@@ -137,11 +137,11 @@ main :: proc() {
 		panic("Couldn't initialize SDL-ttf")
 	}
 	defer SDL_ttf.Quit()
-	basic_font = SDL_ttf.OpenFont("assets/fonts/chess_font.ttf", state.ui_ctx.piece_resolution)
+	chess_font = SDL_ttf.OpenFont("assets/fonts/chess_font.ttf", state.ui_ctx.piece_resolution)
 	if SDL_ttf.GetError()!=""{
 		panic(fmt.tprintln(SDL_ttf.GetError()))
 	}
-	defer SDL_ttf.CloseFont(basic_font)
+	defer SDL_ttf.CloseFont(chess_font)
 
 	// loading chessboard as image
 	SDL_Image.Init(SDL_Image.InitFlags{.JPG, .PNG})
@@ -168,19 +168,19 @@ main :: proc() {
 	access:i32
 	w, h:i32
 	{
-		piece_atlas_surf := SDL_ttf.RenderText_Blended(basic_font, " otjnwl", {20, 20, 20, 255})
-		if piece_atlas_surf == nil{
+		white_pieces_surf := SDL_ttf.RenderText_Blended(chess_font, " otjnwl", {150, 150, 150, 255})
+		if white_pieces_surf == nil{
 			panic("Couldn't render from font")
 		}
-		defer SDL.FreeSurface(piece_atlas_surf)
-		white_pieces_atlas := SDL.CreateTextureFromSurface(renderer, piece_atlas_surf)
+		defer SDL.FreeSurface(white_pieces_surf)
+		white_pieces_atlas := SDL.CreateTextureFromSurface(renderer, white_pieces_surf)
 		if white_pieces_atlas == nil{
 			panic("Couldn't create texture from white pieces surface")
 		}
 		defer SDL.DestroyTexture(white_pieces_atlas)
 		SDL.QueryTexture(white_pieces_atlas, &format, &access, &w, &h)
 
-		black_pieces_surf := SDL_ttf.RenderText_Blended(basic_font, " otjnwl", {200, 200, 200, 255})
+		black_pieces_surf := SDL_ttf.RenderText_Blended(chess_font, " otjnwl",  {20, 20, 20, 255})
 		if black_pieces_surf == nil{
 			panic("Couldn't render from font")
 		}
@@ -195,8 +195,9 @@ main :: proc() {
 		SDL.SetRenderTarget(renderer, piece_atlas)
 		SDL.RenderClear(renderer)
 		SDL.RenderCopy(renderer, black_pieces_atlas, nil, &{0, 0, w, h})
-		SDL.QueryTexture(black_pieces_atlas, &format, &access, &w, &h)
-		SDL.RenderCopy(renderer, white_pieces_atlas, nil, &{0, 0, w, h})
+		// //shouldn't change anything, I assume that never even happens
+		// SDL.QueryTexture(black_pieces_atlas, &format, &access, &w, &h)
+		SDL.RenderCopy(renderer, white_pieces_atlas, nil, &{0, state.ui_ctx.piece_resolution, w, h})
 		SDL.SetRenderTarget(renderer, nil)
 	}
 	cb_pieces_overlay_size:i32 = state.ui_ctx.chessboard_resolution
@@ -214,29 +215,47 @@ main :: proc() {
 	SDL.SetRenderTarget(renderer, pieces_overlay_tex)
 	SDL.SetRenderDrawColor(renderer, 255, 255, 255, 0)
 	SDL.RenderClear(renderer)
-	render_piece :: proc(renderer: ^SDL.Renderer, piece_type: Piece_Type, pos:Vec2i){
+	render_piece :: proc(renderer: ^SDL.Renderer, piece_type: Piece_Type, color: Piece_Color, pos:Vec2i){
 		piece_atlas := textures["PiecesAtlas"]
 		assert(piece_atlas != nil)
-		src_rect := SDL.Rect{state.ui_ctx.piece_resolution * i32(piece_type), 0, state.ui_ctx.piece_resolution, state.ui_ctx.piece_resolution}
+		src_rect := SDL.Rect{state.ui_ctx.piece_resolution * i32(piece_type), i32(color) * state.ui_ctx.piece_resolution, state.ui_ctx.piece_resolution, state.ui_ctx.piece_resolution}
 		dst_tile_size := state.ui_ctx.chessboard_resolution/8
 		dst_rect := SDL.Rect{pos.x * dst_tile_size, pos.y * dst_tile_size, dst_tile_size, dst_tile_size}
 		SDL.RenderCopy(renderer, piece_atlas, &src_rect, &dst_rect)
 	}
-	render_piece(renderer, Piece_Type.Bishop, Vec2i{1,2})
-	// render_starting_position :: proc(renderer: ^SDL.Renderer){
-	// 	SDL.RenderClear(renderer)
-	// 	y_rank:i32 = 7
-	// 	color := Piece_Color.White
-	// 	render_piece(renderer, Piece_Type.Rook, color, Vec2i{0,y_rank})
-	// 	render_piece(renderer, Piece_Type.Rook, color, Vec2i{7,y_rank})
-	// 	render_piece(renderer, Piece_Type.Knight, color, Vec2i{1,y_rank})
-	// 	render_piece(renderer, Piece_Type.Knight, color, Vec2i{6,y_rank})
-	// 	render_piece(renderer, Piece_Type.Bishop, color, Vec2i{5,y_rank})
-	// 	render_piece(renderer, Piece_Type.Bishop, color, Vec2i{2,y_rank})
-	// 	render_piece(renderer, Piece_Type.Queen, color, Vec2i{3,y_rank})
-	// 	render_piece(renderer, Piece_Type.King, color, Vec2i{4,y_rank})
-	// }
-	// render_starting_position(renderer)
+	render_piece(renderer, Piece_Type.Bishop, .Black, Vec2i{1,2})
+	render_starting_position :: proc(renderer: ^SDL.Renderer){
+		SDL.RenderClear(renderer)
+
+		y_rank:i32 = 7
+		color := Piece_Color.White
+		render_piece(renderer, Piece_Type.Rook, color, Vec2i{0,y_rank})
+		render_piece(renderer, Piece_Type.Rook, color, Vec2i{7,y_rank})
+		render_piece(renderer, Piece_Type.Knight, color, Vec2i{1,y_rank})
+		render_piece(renderer, Piece_Type.Knight, color, Vec2i{6,y_rank})
+		render_piece(renderer, Piece_Type.Bishop, color, Vec2i{5,y_rank})
+		render_piece(renderer, Piece_Type.Bishop, color, Vec2i{2,y_rank})
+		render_piece(renderer, Piece_Type.Queen, color, Vec2i{3,y_rank})
+		render_piece(renderer, Piece_Type.King, color, Vec2i{4,y_rank})
+		for x:i32 = 0;x <= 7;x += 1{
+			render_piece(renderer, Piece_Type.Pawn, color, Vec2i{x, y_rank - 1})
+		}
+
+		y_rank = 0
+		color = Piece_Color.Black
+		render_piece(renderer, Piece_Type.Rook, color, Vec2i{0,y_rank})
+		render_piece(renderer, Piece_Type.Rook, color, Vec2i{7,y_rank})
+		render_piece(renderer, Piece_Type.Knight, color, Vec2i{1,y_rank})
+		render_piece(renderer, Piece_Type.Knight, color, Vec2i{6,y_rank})
+		render_piece(renderer, Piece_Type.Bishop, color, Vec2i{5,y_rank})
+		render_piece(renderer, Piece_Type.Bishop, color, Vec2i{2,y_rank})
+		render_piece(renderer, Piece_Type.Queen, color, Vec2i{3,y_rank})
+		render_piece(renderer, Piece_Type.King, color, Vec2i{4,y_rank})
+		for x:i32 = 0;x <= 7;x += 1{
+			render_piece(renderer, Piece_Type.Pawn, color, Vec2i{x, y_rank + 1})
+		}
+	}
+	render_starting_position(renderer)
 	SDL.SetRenderTarget(renderer, nil)
 
 	ctx := &state.mu_ctx
@@ -553,6 +572,10 @@ Chess_Result :: enum u8{
 	Draw
 }
 
+Piece_Color :: enum u8{
+	Black,
+	White
+}
 Piece_Type :: enum u8{
 	None,
 	Pawn,
