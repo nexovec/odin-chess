@@ -13,8 +13,19 @@ import strings "core:strings"
 
 Vec2i :: distinct [2]i32
 
+UI_Context :: struct{
+	held_piece: Piece_Type,
+	piece_resolution: i32,
+	chessboard_resolution: i32,
+}
+default_ui_ctx := UI_Context{
+	nil,
+	64,
+	1024
+}
 state := struct {
 	mu_ctx:          mu.Context,
+	ui_ctx:			 UI_Context,
 	log_buf:         [1 << 16]byte,
 	log_buf_len:     int,
 	log_buf_updated: bool,
@@ -23,7 +34,8 @@ state := struct {
 	sdl_wsize: Vec2i
 } {
 	bg = {90, 95, 100, 255},
-	sdl_wsize = Vec2i{960, 540}
+	sdl_wsize = Vec2i{960, 540},
+	ui_ctx = default_ui_ctx
 }
 
 MU_PROPERTIES := struct{
@@ -125,7 +137,7 @@ main :: proc() {
 		panic("Couldn't initialize SDL-ttf")
 	}
 	defer SDL_ttf.Quit()
-	basic_font = SDL_ttf.OpenFont("assets/fonts/chess_font.ttf", 25)
+	basic_font = SDL_ttf.OpenFont("assets/fonts/chess_font.ttf", state.ui_ctx.piece_resolution)
 	if SDL_ttf.GetError()!=""{
 		panic(fmt.tprintln(SDL_ttf.GetError()))
 	}
@@ -152,37 +164,47 @@ main :: proc() {
 	defer SDL.DestroyTexture(cb_texture)
 	textures["Chessboard"] = cb_texture
 
-	text_surf := SDL_ttf.RenderText_Blended(basic_font, "otjnwl", {20, 20, 20, 255.0})
-	if text_surf == nil{
+	piece_atlas_surf := SDL_ttf.RenderText_Blended(basic_font, " otjnwl", {20, 20, 20, 255.0})
+	if piece_atlas_surf == nil{
 		panic("Couldn't render from font")
 	}
-	defer SDL.FreeSurface(text_surf)
-	text_texture := SDL.CreateTextureFromSurface(renderer, text_surf)
-	if text_texture == nil{
+	defer SDL.FreeSurface(piece_atlas_surf)
+	piece_atlas_tex := SDL.CreateTextureFromSurface(renderer, piece_atlas_surf)
+	if piece_atlas_tex == nil{
 		panic("Couldn't create texture from text surface")
 	}
+	defer SDL.DestroyTexture(piece_atlas_tex)
+	textures["PiecesAtlas"] = piece_atlas_tex
+
 	format:u32
 	access:i32
 	w, h:i32
-	SDL.QueryTexture(text_texture, &format, &access, &w, &h)
-	pieces_texture := SDL.CreateTexture(renderer, format, SDL.TextureAccess.TARGET, 1024, 1024)
+	SDL.QueryTexture(piece_atlas_tex, &format, &access, &w, &h)
+	cb_pieces_overlay_size:i32 = state.ui_ctx.chessboard_resolution
+	pieces_texture := SDL.CreateTexture(renderer, format, SDL.TextureAccess.TARGET, cb_pieces_overlay_size, cb_pieces_overlay_size)
 	if pieces_texture == nil{
 		panic("Couldn't create textures from surface")
 	}
 	SDL.QueryTexture(pieces_texture, &format, &access, &w, &h)
-	// fmt.eprintln("sizes:", w, h)
+	assert(cb_pieces_overlay_size % state.ui_ctx.piece_resolution == 0)
 	defer SDL.DestroyTexture(pieces_texture)
 
 	// drawing pieces
 	SDL.SetTextureBlendMode(pieces_texture,  SDL.BlendMode.BLEND)
+	textures["Pieces"]=pieces_texture
 	SDL.SetRenderTarget(renderer, pieces_texture)
 	SDL.SetRenderDrawColor(renderer, 255, 255, 255, 0)
 	SDL.RenderClear(renderer)
-	src_rect := SDL.Rect{25 * i32(Piece_Type.Knight), 0, 25, 25}
-	dst_rect := SDL.Rect{0,0, 128, 128}
-	SDL.RenderCopy(renderer, text_texture, &src_rect, &dst_rect)
+	render_piece :: proc(renderer: ^SDL.Renderer, piece_type: Piece_Type, pos:Vec2i){
+		piece_atlas := textures["PiecesAtlas"]
+		assert(piece_atlas != nil)
+		src_rect := SDL.Rect{state.ui_ctx.piece_resolution * i32(piece_type), 0, state.ui_ctx.piece_resolution, state.ui_ctx.piece_resolution}
+		dst_tile_size := state.ui_ctx.chessboard_resolution/8
+		dst_rect := SDL.Rect{pos.x * dst_tile_size, pos.y * dst_tile_size, dst_tile_size, dst_tile_size}
+		SDL.RenderCopy(renderer, piece_atlas, &src_rect, &dst_rect)
+	}
+	render_piece(renderer, Piece_Type.Bishop, Vec2i{1,2})
 	SDL.SetRenderTarget(renderer, nil)
-	textures["Pieces"]=pieces_texture
 
 	ctx := &state.mu_ctx
 	mu.init(ctx)
@@ -499,6 +521,7 @@ Chess_Result :: enum u8{
 }
 
 Piece_Type :: enum u8{
+	None,
 	Pawn,
 	Rook,
 	Knight,
