@@ -4,7 +4,7 @@ import "core:reflect"
 // import io "core:io"
 import strings "core:strings"
 import fmt "core:fmt"
-import io "core:io"
+// import io "core:io"
 import "core:strconv"
 
 /* reads a delimited move(without annotations) from the string, doesn't consume the delimiter, result is NULL terminated*/

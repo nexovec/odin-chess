@@ -19,7 +19,7 @@ UI_Context :: struct{
 	chessboard_resolution: i32,
 }
 default_ui_ctx := UI_Context{
-	nil,
+	.None,
 	64,
 	1024
 }
@@ -52,6 +52,19 @@ chess_font: ^SDL_ttf.Font
 
 textures:map[string]^SDL.Texture
 
+render_piece :: proc(renderer: ^SDL.Renderer, piece_type: Piece_Type, color: Piece_Color, dst_rect: ^SDL.Rect){
+	piece_atlas := textures["PiecesAtlas"]
+	assert(piece_atlas != nil)
+	src_rect := SDL.Rect{state.ui_ctx.piece_resolution * i32(piece_type), i32(color) * state.ui_ctx.piece_resolution, state.ui_ctx.piece_resolution, state.ui_ctx.piece_resolution}
+	SDL.RenderCopy(renderer, piece_atlas, &src_rect, dst_rect)
+}
+
+render_piece_at_tile :: proc(renderer: ^SDL.Renderer, piece_type: Piece_Type, color: Piece_Color, pos:Vec2i){
+	dst_tile_size := state.ui_ctx.chessboard_resolution/8
+	dst_rect := SDL.Rect{pos.x * dst_tile_size, pos.y * dst_tile_size, dst_tile_size, dst_tile_size}
+	render_piece(renderer, piece_type, color, &dst_rect)
+}
+
 main :: proc() {
 	fmt.eprintln("STARTING PROGRAM!")
 	if err := SDL.Init(SDL.INIT_EVERYTHING); err != 0 {
@@ -62,8 +75,8 @@ main :: proc() {
 	display_mode: SDL.DisplayMode
 	SDL.GetCurrentDisplayMode(0, &display_mode)
 	refresh_rate := display_mode.refresh_rate
-	if refresh_rate == 0 {
-		refresh_rate = 60
+	if refresh_rate <= 30 {
+		refresh_rate = 30
 	}
 	time_per_tick:i32 = 1000/refresh_rate
 	window := SDL.CreateWindow(
@@ -215,44 +228,35 @@ main :: proc() {
 	SDL.SetRenderTarget(renderer, pieces_overlay_tex)
 	SDL.SetRenderDrawColor(renderer, 255, 255, 255, 0)
 	SDL.RenderClear(renderer)
-	render_piece :: proc(renderer: ^SDL.Renderer, piece_type: Piece_Type, color: Piece_Color, pos:Vec2i){
-		piece_atlas := textures["PiecesAtlas"]
-		assert(piece_atlas != nil)
-		src_rect := SDL.Rect{state.ui_ctx.piece_resolution * i32(piece_type), i32(color) * state.ui_ctx.piece_resolution, state.ui_ctx.piece_resolution, state.ui_ctx.piece_resolution}
-		dst_tile_size := state.ui_ctx.chessboard_resolution/8
-		dst_rect := SDL.Rect{pos.x * dst_tile_size, pos.y * dst_tile_size, dst_tile_size, dst_tile_size}
-		SDL.RenderCopy(renderer, piece_atlas, &src_rect, &dst_rect)
-	}
-	render_piece(renderer, Piece_Type.Bishop, .Black, Vec2i{1,2})
 	render_starting_position :: proc(renderer: ^SDL.Renderer){
 		SDL.RenderClear(renderer)
 
 		y_rank:i32 = 7
 		color := Piece_Color.White
-		render_piece(renderer, Piece_Type.Rook, color, Vec2i{0,y_rank})
-		render_piece(renderer, Piece_Type.Rook, color, Vec2i{7,y_rank})
-		render_piece(renderer, Piece_Type.Knight, color, Vec2i{1,y_rank})
-		render_piece(renderer, Piece_Type.Knight, color, Vec2i{6,y_rank})
-		render_piece(renderer, Piece_Type.Bishop, color, Vec2i{5,y_rank})
-		render_piece(renderer, Piece_Type.Bishop, color, Vec2i{2,y_rank})
-		render_piece(renderer, Piece_Type.Queen, color, Vec2i{3,y_rank})
-		render_piece(renderer, Piece_Type.King, color, Vec2i{4,y_rank})
+		render_piece_at_tile(renderer, Piece_Type.Rook, color, Vec2i{0,y_rank})
+		render_piece_at_tile(renderer, Piece_Type.Rook, color, Vec2i{7,y_rank})
+		render_piece_at_tile(renderer, Piece_Type.Knight, color, Vec2i{1,y_rank})
+		render_piece_at_tile(renderer, Piece_Type.Knight, color, Vec2i{6,y_rank})
+		render_piece_at_tile(renderer, Piece_Type.Bishop, color, Vec2i{5,y_rank})
+		render_piece_at_tile(renderer, Piece_Type.Bishop, color, Vec2i{2,y_rank})
+		render_piece_at_tile(renderer, Piece_Type.Queen, color, Vec2i{3,y_rank})
+		render_piece_at_tile(renderer, Piece_Type.King, color, Vec2i{4,y_rank})
 		for x:i32 = 0;x <= 7;x += 1{
-			render_piece(renderer, Piece_Type.Pawn, color, Vec2i{x, y_rank - 1})
+			render_piece_at_tile(renderer, Piece_Type.Pawn, color, Vec2i{x, y_rank - 1})
 		}
 
 		y_rank = 0
 		color = Piece_Color.Black
-		render_piece(renderer, Piece_Type.Rook, color, Vec2i{0,y_rank})
-		render_piece(renderer, Piece_Type.Rook, color, Vec2i{7,y_rank})
-		render_piece(renderer, Piece_Type.Knight, color, Vec2i{1,y_rank})
-		render_piece(renderer, Piece_Type.Knight, color, Vec2i{6,y_rank})
-		render_piece(renderer, Piece_Type.Bishop, color, Vec2i{5,y_rank})
-		render_piece(renderer, Piece_Type.Bishop, color, Vec2i{2,y_rank})
-		render_piece(renderer, Piece_Type.Queen, color, Vec2i{3,y_rank})
-		render_piece(renderer, Piece_Type.King, color, Vec2i{4,y_rank})
+		render_piece_at_tile(renderer, Piece_Type.Rook, color, Vec2i{0,y_rank})
+		render_piece_at_tile(renderer, Piece_Type.Rook, color, Vec2i{7,y_rank})
+		render_piece_at_tile(renderer, Piece_Type.Knight, color, Vec2i{1,y_rank})
+		render_piece_at_tile(renderer, Piece_Type.Knight, color, Vec2i{6,y_rank})
+		render_piece_at_tile(renderer, Piece_Type.Bishop, color, Vec2i{5,y_rank})
+		render_piece_at_tile(renderer, Piece_Type.Bishop, color, Vec2i{2,y_rank})
+		render_piece_at_tile(renderer, Piece_Type.Queen, color, Vec2i{3,y_rank})
+		render_piece_at_tile(renderer, Piece_Type.King, color, Vec2i{4,y_rank})
 		for x:i32 = 0;x <= 7;x += 1{
-			render_piece(renderer, Piece_Type.Pawn, color, Vec2i{x, y_rank + 1})
+			render_piece_at_tile(renderer, Piece_Type.Pawn, color, Vec2i{x, y_rank + 1})
 		}
 	}
 	render_starting_position(renderer)
@@ -408,6 +412,10 @@ render :: proc(ctx: ^mu.Context, renderer: ^SDL.Renderer) {
 			unreachable()
 		}
 	}
+	mx, my:i32
+	SDL.GetMouseState(&mx, &my)
+	piece_size := state.ui_ctx.piece_resolution
+	render_piece(renderer, state.ui_ctx.held_piece, .Black, &{mx, my, piece_size, piece_size})
 	SDL.RenderPresent(renderer)
 }
 
