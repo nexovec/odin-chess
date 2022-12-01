@@ -19,7 +19,7 @@ UI_Context :: struct{
 	chessboard_resolution: i32,
 }
 default_ui_ctx := UI_Context{
-	.None,
+	.Pawn,
 	64,
 	1024
 }
@@ -211,7 +211,7 @@ main :: proc() {
 		// //shouldn't change anything, I assume that never even happens
 		// SDL.QueryTexture(black_pieces_atlas, &format, &access, &w, &h)
 		SDL.RenderCopy(renderer, white_pieces_atlas, nil, &{0, state.ui_ctx.piece_resolution, w, h})
-		SDL.SetRenderTarget(renderer, nil)
+		// SDL.SetRenderTarget(renderer, nil)
 	}
 	cb_pieces_overlay_size:i32 = state.ui_ctx.chessboard_resolution
 	pieces_overlay_tex := SDL.CreateTexture(renderer, format, SDL.TextureAccess.TARGET, cb_pieces_overlay_size, cb_pieces_overlay_size)
@@ -222,6 +222,15 @@ main :: proc() {
 	assert(cb_pieces_overlay_size % state.ui_ctx.piece_resolution == 0)
 	defer SDL.DestroyTexture(pieces_overlay_tex)
 
+	hovering_chess_piece_tex := SDL.CreateTexture(renderer, format, SDL.TextureAccess(access), state.ui_ctx.piece_resolution, state.ui_ctx.piece_resolution)
+	assert(hovering_chess_piece_tex != nil)
+	defer SDL.DestroyTexture(hovering_chess_piece_tex)
+	textures["MouseLabel"] = hovering_chess_piece_tex
+	SDL.SetTextureBlendMode(hovering_chess_piece_tex, SDL.BlendMode.BLEND)
+	SDL.SetRenderTarget(renderer, hovering_chess_piece_tex)
+	SDL.SetRenderDrawColor(renderer, 255, 255, 255, 255)
+	// SDL.RenderClear(renderer)
+	render_piece(renderer, state.ui_ctx.held_piece, Piece_Color.Black, &{0, 0, state.ui_ctx.piece_resolution, state.ui_ctx.piece_resolution})
 	// drawing pieces
 	SDL.SetTextureBlendMode(pieces_overlay_tex,  SDL.BlendMode.BLEND)
 	textures["Pieces"]=pieces_overlay_tex
@@ -415,7 +424,7 @@ render :: proc(ctx: ^mu.Context, renderer: ^SDL.Renderer) {
 	mx, my:i32
 	SDL.GetMouseState(&mx, &my)
 	piece_size := state.ui_ctx.piece_resolution
-	render_piece(renderer, state.ui_ctx.held_piece, .Black, &{mx, my, piece_size, piece_size})
+	SDL.RenderCopy(renderer, textures["MouseLabel"], nil, &{mx, my, state.ui_ctx.piece_resolution, state.ui_ctx.piece_resolution})
 	SDL.RenderPresent(renderer)
 }
 
