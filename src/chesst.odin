@@ -68,13 +68,13 @@ render_piece_at_tile :: proc(renderer: ^SDL.Renderer, piece_type: Piece_Type, co
 }
 
 // represent a chessboard
-Square_Info :: struct{
+Piece_info :: struct{
 	piece_type: Piece_Type,
 	piece_color: Piece_Color,
 }
 
 Chessboard_Info :: struct{
-	square_info: [64]Square_Info
+	square_info: [64]Piece_info
 }
 
 Chess_Coordinate :: struct{
@@ -83,7 +83,7 @@ Chess_Coordinate :: struct{
 }
 
 Square_Info_Full :: struct{
-	using square: Square_Info,
+	using square: Piece_info,
 	using coord: Chess_Coordinate
 }
 
@@ -101,9 +101,6 @@ Chess_Move_Full :: struct{
 get_unrestricted_moves_of_piece :: proc(mv :Square_Info_Full, moves:[dynamic]Chess_Move_Full) -> [dynamic]Chess_Move_Full{
 	// TODO: test
 	moves:=moves
-	if moves == nil{
-		moves = make([dynamic]Chess_Move_Full, 0, 6, context.temp_allocator)
-	}
 	move := Chess_Move_Full{}
 	move.piece_color = mv.piece_color
 	move.piece_type = mv.piece_type
@@ -414,7 +411,7 @@ main :: proc() {
 	// SDL.RenderClear(renderer)
 
 
-	place_piece :: proc(cbinfo: ^Chessboard_Info, x: u8, y: u8, piece: Square_Info){
+	place_piece :: proc(cbinfo: ^Chessboard_Info, x: u8, y: u8, piece: Piece_info){
 		cbinfo.square_info[x+8*y] = piece
 	}
 	default_chessboard_info :: proc() -> Chessboard_Info{
@@ -1078,7 +1075,7 @@ all_windows :: proc(ctx: ^mu.Context) {
 			x, y := mx - rect.x, my - rect.y
 			tile_size := rect.w / 8
 			tile_x, tile_y: i32 = x / tile_size, 7 - y / tile_size
-			fmt.eprintln("Mouse over chess square: ", rune('a'+tile_x), tile_y+1)
+			// fmt.eprintln("Mouse over chess square: ", rune('a'+tile_x), tile_y+1)
 			state.ui_ctx.hovered_square = Vec2i{tile_x, tile_y}
 		}
 		else{
