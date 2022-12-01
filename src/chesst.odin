@@ -17,11 +17,13 @@ UI_Context :: struct{
 	held_piece: Piece_Type,
 	piece_resolution: i32,
 	chessboard_resolution: i32,
+	hovered_square: Vec2i
 }
 default_ui_ctx := UI_Context{
 	.Pawn,
 	64,
-	1024
+	1024,
+	{0,0}
 }
 state := struct {
 	mu_ctx:          mu.Context,
@@ -270,21 +272,12 @@ main :: proc() {
 	}
 	render_starting_position(renderer)
 
+	SDL.SetRenderTarget(renderer, nil)
+
 	chessboard_highlights_tex := SDL.CreateTexture(renderer, format, SDL.TextureAccess(access), w, h)
 	textures["ChessboardHighlights"] = chessboard_highlights_tex
-	SDL.SetRenderTarget(renderer, chessboard_highlights_tex)
+	defer SDL.DestroyTexture(chessboard_highlights_tex)
 	SDL.SetTextureBlendMode(chessboard_highlights_tex, .BLEND)
-	SDL.RenderClear(renderer)
-	coords := Vec2i{2,1}
-	tile_size := state.ui_ctx.chessboard_resolution/8
-	SDL.SetRenderDrawColor(renderer, 0, 0, 0, 0)
-	SDL.RenderClear(renderer)
-	SDL.SetRenderDrawColor(renderer, 200, 100, 100, 255)
-	SDL.RenderFillRect(renderer, &{coords.x * tile_size, coords.y * tile_size, tile_size, tile_size})
-	SDL.SetRenderDrawColor(renderer, 0, 0, 0, 0)
-	SDL.RenderFillRect(renderer, &{coords.x * tile_size + 8, coords.y * tile_size + 8, tile_size - 16, tile_size - 16})
-
-	SDL.SetRenderTarget(renderer, nil)
 
 	ctx := &state.mu_ctx
 	mu.init(ctx)
@@ -441,6 +434,19 @@ render :: proc(ctx: ^mu.Context, renderer: ^SDL.Renderer) {
 	piece_size := state.ui_ctx.piece_resolution
 	// mu.draw_image(ctx, "MouseLabel", {mx, my, state.ui_ctx.piece_resolution, state.ui_ctx.piece_resolution})
 	SDL.RenderCopy(renderer, textures["MouseLabel"], nil, &{mx, my, state.ui_ctx.piece_resolution, state.ui_ctx.piece_resolution})
+
+	chessboard_highlights_tex := textures["ChessboardHighlights"]
+	SDL.SetRenderTarget(renderer, chessboard_highlights_tex)
+	SDL.RenderClear(renderer)
+	coords := state.ui_ctx.hovered_square
+	tile_size := state.ui_ctx.chessboard_resolution/8
+	SDL.SetRenderDrawColor(renderer, 0, 0, 0, 0)
+	SDL.RenderClear(renderer)
+	SDL.SetRenderDrawColor(renderer, 200, 100, 100, 255)
+	SDL.RenderFillRect(renderer, &{coords.x * tile_size, (7 - coords.y) * (tile_size), tile_size, tile_size})
+	SDL.SetRenderDrawColor(renderer, 0, 0, 0, 0)
+	SDL.RenderFillRect(renderer, &{coords.x * tile_size + 8, (7 - coords.y) * tile_size + 8, tile_size - 16, tile_size - 16})
+	SDL.SetRenderTarget(renderer, nil)
 
 	SDL.RenderPresent(renderer)
 }
@@ -873,6 +879,13 @@ all_windows :: proc(ctx: ^mu.Context) {
 		mu.draw_image(ctx, "Pieces", rect)
 		if mu.mouse_over(ctx, rect){
 			mu.text(ctx, "Test text")
+			mx, my:i32
+			SDL.GetMouseState(&mx, &my)
+			x, y := mx - rect.x, my - rect.y
+			tile_size := rect.w / 8
+			tile_x, tile_y: i32 = x / tile_size, 7 - y / tile_size
+			fmt.eprintln("Mouse over chess square: ", rune('a'+tile_x), tile_y+1)
+			state.ui_ctx.hovered_square = Vec2i{tile_x, tile_y}
 		}
 	}
 	if mu.window(ctx, "Open file", {200, 50, 400, 400}){
