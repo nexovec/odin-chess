@@ -67,6 +67,186 @@ render_piece_at_tile :: proc(renderer: ^SDL.Renderer, piece_type: Piece_Type, co
 	render_piece(renderer, piece_type, color, &dst_rect)
 }
 
+// represent a chessboard
+Square_Info :: struct{
+	piece_type: Piece_Type,
+	piece_color: Piece_Color,
+}
+
+Chessboard_Info :: struct{
+	square_info: [64]Square_Info
+}
+
+Chess_Coordinate :: struct{
+	x: u8,
+	y: u8
+}
+
+Square_Info_Full :: struct{
+	using square: Square_Info,
+	using coord: Chess_Coordinate
+}
+
+Chess_Move :: struct{
+	src: Chess_Coordinate,
+	dst: Chess_Coordinate
+}
+
+Chess_Move_Full :: struct{
+	using move:Chess_Move,
+	piece_type: Piece_Type,
+	piece_color: Piece_Color
+}
+
+get_unrestricted_moves_of_piece :: proc(mv :Square_Info_Full, moves:[dynamic]Chess_Move_Full) -> [dynamic]Chess_Move_Full{
+	// TODO: test
+	moves:=moves
+	if moves == nil{
+		moves = make([dynamic]Chess_Move_Full, 0, 6, context.temp_allocator)
+	}
+	move := Chess_Move_Full{}
+	move.piece_color = mv.piece_color
+	move.piece_type = mv.piece_type
+	move.src = mv.coord
+	dst := &move.dst
+	switch mv.piece_type{
+		case .None:
+		case .Pawn:
+			is_b := mv.piece_color == .Black
+			is_w := !is_b
+			if mv.x > 0{
+				move.dst = {mv.x-1, mv.y-u8(is_b)+u8(is_w)}
+				append(&moves, move)
+			}
+			if mv.y < 7{
+				move.dst = {mv.x+1, mv.y-u8(is_b)+u8(is_w)}
+				append(&moves, move)
+			}
+			move.dst = {mv.x, mv.y-u8(is_b)+u8(is_w)}
+			append(&moves, move)
+			if mv.y == 1 && is_w{
+				move.dst = {mv.x, mv.y+2}
+				append(&moves, move)
+			}else if mv.y == 6 && is_b{
+				move.dst = {mv.x, mv.y-2}
+				append(&moves, move)
+			}
+			if is_b && mv.y == 1{
+				// TODO: unpack the existing moves
+				unimplemented("Pawn promotions are not implemented yet")
+			}
+			else if is_w && mv.y == 6{
+				unimplemented("Pawn promotions are not implemented yet")
+			}
+		case .Rook:
+			for i:u8=0; i<mv.x; i+=1{
+				move.dst = {i, mv.y}
+				append(&moves, move)
+			}
+			for i:u8=0; i<mv.y; i+=1{
+				move.dst = {mv.x, i}
+				append(&moves, move)
+			}
+			for i:u8=mv.x+1; i<8; i+=1{
+				move.dst = {i, mv.y}
+				append(&moves, move)
+			}
+			for i:u8=mv.y+1; i<8; i+=1{
+				move.dst = {mv.x, i}
+				append(&moves, move)
+			}
+		case .Knight:
+			c:=[]Chess_Coordinate{
+				{mv.x+1, mv.y+2},
+				{mv.x+1, mv.y-2},
+				{mv.x-1, mv.y+2},
+				{mv.x-1, mv.y-2},
+				{mv.x+2, mv.y+1},
+				{mv.x+2, mv.y-1},
+				{mv.x-2, mv.y+1},
+				{mv.x-2, mv.y-1},
+			}
+			for p in c{
+				if p.x<8 && p.y<8{
+					move.dst = p
+					append(&moves, move)
+				}
+			}
+		case .Bishop:
+			for i:u8=1; mv.x+i<8 && mv.y + i<8; i+=1{
+				move.dst = {mv.x+i, mv.y+i}
+				append(&moves, move)
+			}
+			for i:u8=1; mv.x-i<8 && mv.y + i<8; i+=1{
+				move.dst = {mv.x-i, mv.y+i}
+				append(&moves, move)
+			}
+			for i:u8=1; mv.x+i<8 && mv.y-i<8; i+=1{
+				move.dst = {mv.x+i, mv.y-i}
+				append(&moves, move)
+			}
+			for i:u8=1; mv.x-i<8 && mv.y-i<8; i+=1{
+				move.dst = {mv.x-i, mv.y-i}
+				append(&moves, move)
+			}
+		case .King:
+			c:=[]Chess_Coordinate{
+				{mv.x-1, mv.y+1},
+				{mv.x-1, mv.y},
+				{mv.x-1, mv.y-1},
+				{mv.x, mv.y+1},
+				{mv.x, mv.y-1},
+				{mv.x+1, mv.y+1},
+				{mv.x+1, mv.y},
+				{mv.x+1, mv.y-1},
+			}
+			for p in c{
+				if p.x<8 && p.y<8{
+					move.dst = p
+					append(&moves, move)
+				}
+			}
+			// Q: if I destroy a slice, but it was a dynamic array that I took a slice of, does it deallocate properly?
+		case .Queen:
+			// FIXME: this is a copy of rook and bishop moves
+			// mv.piece_type = .Bishop // TODO: this but with .Queen
+			// get_unrestricted_moves_of_piece(mv, moves)
+			for i:u8=0; i<mv.x; i+=1{
+				move.dst = {i, mv.y}
+				append(&moves, move)
+			}
+			for i:u8=0; i<mv.y; i+=1{
+				move.dst = {mv.x, i}
+				append(&moves, move)
+			}
+			for i:u8=mv.x+1; i<8; i+=1{
+				move.dst = {i, mv.y}
+				append(&moves, move)
+			}
+			for i:u8=mv.y+1; i<8; i+=1{
+				move.dst = {mv.x, i}
+				append(&moves, move)
+			}
+			for i:u8=1; mv.x+i<8 && mv.y + i<8; i+=1{
+				move.dst = {mv.x+i, mv.y+i}
+				append(&moves, move)
+			}
+			for i:u8=1; mv.x-i<8 && mv.y + i<8; i+=1{
+				move.dst = {mv.x-i, mv.y+i}
+				append(&moves, move)
+			}
+			for i:u8=1; mv.x+i<8 && mv.y-i<8; i+=1{
+				move.dst = {mv.x+i, mv.y-i}
+				append(&moves, move)
+			}
+			for i:u8=1; mv.x-i<8 && mv.y-i<8; i+=1{
+				move.dst = {mv.x-i, mv.y-i}
+				append(&moves, move)
+			}
+	}
+	return moves
+}
+
 main :: proc() {
 	fmt.eprintln("STARTING PROGRAM!")
 	if err := SDL.Init(SDL.INIT_EVERYTHING); err != 0 {
@@ -233,36 +413,6 @@ main :: proc() {
 	SDL.SetRenderDrawColor(renderer, 255, 255, 255, 255)
 	// SDL.RenderClear(renderer)
 
-	// represent a chessboard
-	Square_Info :: struct{
-		piece_type: Piece_Type,
-		piece_color: Piece_Color,
-	}
-
-	Chessboard_Info :: struct{
-		square_info: [64]Square_Info
-	}
-
-	Chess_Coordinate :: struct{
-		x: u8,
-		y: u8
-	}
-
-	Square_Info_Full :: struct{
-		using square: Square_Info,
-		using coord: Chess_Coordinate
-	}
-
-	Chess_Move :: struct{
-		src: Chess_Coordinate,
-		dst: Chess_Coordinate
-	}
-
-	Chess_Move_Full :: struct{
-		using move:Chess_Move,
-		piece_type: Piece_Type,
-		piece_color: Piece_Color
-	}
 
 	place_piece :: proc(cbinfo: ^Chessboard_Info, x: u8, y: u8, piece: Square_Info){
 		cbinfo.square_info[x+8*y] = piece
@@ -294,132 +444,6 @@ main :: proc() {
 		return cbinfo
 	}
 
-	get_unrestricted_moves_of_piece :: proc(mv :Square_Info_Full) -> [dynamic]Chess_Move_Full{
-		// TODO: test
-		moves := make([dynamic]Chess_Move_Full, 0, 6, context.temp_allocator)
-		move := Chess_Move_Full{}
-		move.piece_color = mv.piece_color
-		move.piece_type = mv.piece_type
-		move.src = mv.coord
-		dst := &move.dst
-		switch mv.piece_type{
-			case .None:
-			case .Pawn:
-				is_b := mv.piece_color == .Black
-				is_w := !is_b
-				if mv.x > 0{
-					move.dst = {mv.x-1, mv.y-u8(is_b)+u8(is_w)}
-					append(&moves, move)
-				}
-				if mv.y < 7{
-					move.dst = {mv.x+1, mv.y-u8(is_b)+u8(is_w)}
-					append(&moves, move)
-				}
-				if is_b && mv.y == 1{
-
-				}
-				else if is_w && mv.y == 6{
-
-				}
-				move.dst = {mv.x, mv.y-u8(is_b)+u8(is_w)}
-				append(&moves, move)
-				if mv.y == 1 && is_w{
-					move.dst = {mv.x, mv.y+2}
-					append(&moves, move)
-				}else if mv.y == 6 && is_b{
-					move.dst = {mv.x, mv.y-2}
-					append(&moves, move)
-				}
-			case .Rook:
-				for i:u8=0; i<mv.x; i+=1{
-					move.dst = {i, mv.y}
-					append(&moves, move)
-				}
-				for i:u8=0; i<mv.y; i+=1{
-					move.dst = {mv.x, i}
-					append(&moves, move)
-				}
-				for i:u8=mv.x+1; i<8; i+=1{
-					move.dst = {i, mv.y}
-					append(&moves, move)
-				}
-				for i:u8=mv.y+1; i<8; i+=1{
-					move.dst = {mv.x, i}
-					append(&moves, move)
-				}
-			case .Knight:
-				c:=[]Chess_Coordinate{
-					{mv.x+1, mv.y+2},
-					{mv.x+1, mv.y-2},
-					{mv.x-1, mv.y+2},
-					{mv.x-1, mv.y-2},
-					{mv.x+2, mv.y+1},
-					{mv.x+2, mv.y-1},
-					{mv.x-2, mv.y+1},
-					{mv.x-2, mv.y-1},
-				}
-				for p in c{
-					if p.x<8 && p.y<8{
-						move.dst = p
-						append(&moves, move)
-					}
-				}
-			case .Bishop:
-				for i:u8=1; mv.x+i<8 && mv.y + i<8; i+=1{
-					move.dst = {mv.x+i, mv.y+i}
-					append(&moves, move)
-				}
-				for i:u8=1; mv.x-i<8 && mv.y + i<8; i+=1{
-					move.dst = {mv.x-i, mv.y+i}
-					append(&moves, move)
-				}
-				for i:u8=1; mv.x+i<8 && mv.y-i<8; i+=1{
-					move.dst = {mv.x+i, mv.y-i}
-					append(&moves, move)
-				}
-				for i:u8=1; mv.x-i<8 && mv.y-i<8; i+=1{
-					move.dst = {mv.x-i, mv.y-i}
-					append(&moves, move)
-				}
-			case .King:
-				c:=[]Chess_Coordinate{
-					{mv.x-1, mv.y+1},
-					{mv.x-1, mv.y},
-					{mv.x-1, mv.y-1},
-					{mv.x, mv.y+1},
-					{mv.x, mv.y-1},
-					{mv.x+1, mv.y+1},
-					{mv.x+1, mv.y},
-					{mv.x+1, mv.y-1},
-				}
-				for p in c{
-					if p.x<8 && p.y<8{
-						move.dst = p
-						append(&moves, move)
-					}
-				}
-				// Q: if I destroy a slice, but it was a dynamic array that I took a slice of, does it deallocate properly?
-			case .Queen:
-				// FIXME: this is a copy of rook moves
-				for i:u8=0; i<mv.x; i+=1{
-					move.dst = {i, mv.y}
-					append(&moves, move)
-				}
-				for i:u8=0; i<mv.y; i+=1{
-					move.dst = {mv.x, i}
-					append(&moves, move)
-				}
-				for i:u8=mv.x+1; i<8; i+=1{
-					move.dst = {i, mv.y}
-					append(&moves, move)
-				}
-				for i:u8=mv.y+1; i<8; i+=1{
-					move.dst = {mv.x, i}
-					append(&moves, move)
-				}
-		}
-		return moves
-	}
 	// make_move :: proc(cbinfo: ^Chessboard_Info, mv: PGN_Half_Move){
 	// 	cbinfo
 	// }
