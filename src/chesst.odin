@@ -232,45 +232,96 @@ main :: proc() {
 	SDL.SetRenderTarget(renderer, hovering_chess_piece_tex)
 	SDL.SetRenderDrawColor(renderer, 255, 255, 255, 255)
 	// SDL.RenderClear(renderer)
+
+	// represent a chessboard
+	Square_Info :: struct{
+		piece_type: Piece_Type,
+		piece_color: Piece_Color,
+	}
+
+	Chessboard_Info :: struct{
+		square_info: [64]Square_Info
+	}
+
+	place_piece :: proc(cbinfo: ^Chessboard_Info, x: u8, y: u8, piece: Square_Info){
+		cbinfo.square_info[x+8*y] = piece
+	}
+	default_chessboard_info :: proc() -> Chessboard_Info{
+		cbinfo := Chessboard_Info{}
+		place_piece(&cbinfo, 7, 7, {.Rook,.Black})
+		place_piece(&cbinfo, 0, 7, {.Rook,.Black})
+		place_piece(&cbinfo, 1, 7, {.Knight,.Black})
+		place_piece(&cbinfo, 6, 7, {.Knight,.Black})
+		place_piece(&cbinfo, 2, 7, {.Bishop,.Black})
+		place_piece(&cbinfo, 5, 7, {.Bishop,.Black})
+		place_piece(&cbinfo, 3, 7, {.Queen,.Black})
+		place_piece(&cbinfo, 4, 7, {.King,.Black})
+		place_piece(&cbinfo, 7, 0, {.Rook,.White})
+		place_piece(&cbinfo, 0, 0, {.Rook,.White})
+		place_piece(&cbinfo, 1, 0, {.Knight,.White})
+		place_piece(&cbinfo, 6, 0, {.Knight,.White})
+		place_piece(&cbinfo, 2, 0, {.Bishop,.White})
+		place_piece(&cbinfo, 5, 0, {.Bishop,.White})
+		place_piece(&cbinfo, 3, 0, {.Queen,.White})
+		place_piece(&cbinfo, 4, 0, {.King,.White})
+		for i:u8=0; i<8;i+=1{
+			place_piece(&cbinfo, i, 6, {.Pawn, .Black})
+		}
+		for i:u8=0; i<8;i+=1{
+			place_piece(&cbinfo, i, 1, {.Pawn, .White})
+		}
+		return cbinfo
+	}
+	make_move :: proc(mv: PGN_Half_Move)
+
+	cb := default_chessboard_info()
+
+	// draw hovered piece
 	render_piece(renderer, state.ui_ctx.held_piece, Piece_Color.Black, &{0, 0, state.ui_ctx.piece_resolution, state.ui_ctx.piece_resolution})
 	// drawing pieces
 	SDL.SetTextureBlendMode(pieces_overlay_tex,  SDL.BlendMode.BLEND)
-	textures["Pieces"]=pieces_overlay_tex
+	textures["Pieces"] = pieces_overlay_tex
 	SDL.SetRenderTarget(renderer, pieces_overlay_tex)
 	SDL.SetRenderDrawColor(renderer, 255, 255, 255, 0)
 	SDL.RenderClear(renderer)
-	render_starting_position :: proc(renderer: ^SDL.Renderer){
-		SDL.RenderClear(renderer)
-
-		y_rank:i32 = 7
-		color := Piece_Color.White
-		render_piece_at_tile(renderer, Piece_Type.Rook, color, Vec2i{0,y_rank})
-		render_piece_at_tile(renderer, Piece_Type.Rook, color, Vec2i{7,y_rank})
-		render_piece_at_tile(renderer, Piece_Type.Knight, color, Vec2i{1,y_rank})
-		render_piece_at_tile(renderer, Piece_Type.Knight, color, Vec2i{6,y_rank})
-		render_piece_at_tile(renderer, Piece_Type.Bishop, color, Vec2i{5,y_rank})
-		render_piece_at_tile(renderer, Piece_Type.Bishop, color, Vec2i{2,y_rank})
-		render_piece_at_tile(renderer, Piece_Type.Queen, color, Vec2i{3,y_rank})
-		render_piece_at_tile(renderer, Piece_Type.King, color, Vec2i{4,y_rank})
-		for x:i32 = 0;x <= 7;x += 1{
-			render_piece_at_tile(renderer, Piece_Type.Pawn, color, Vec2i{x, y_rank - 1})
-		}
-
-		y_rank = 0
-		color = Piece_Color.Black
-		render_piece_at_tile(renderer, Piece_Type.Rook, color, Vec2i{0,y_rank})
-		render_piece_at_tile(renderer, Piece_Type.Rook, color, Vec2i{7,y_rank})
-		render_piece_at_tile(renderer, Piece_Type.Knight, color, Vec2i{1,y_rank})
-		render_piece_at_tile(renderer, Piece_Type.Knight, color, Vec2i{6,y_rank})
-		render_piece_at_tile(renderer, Piece_Type.Bishop, color, Vec2i{5,y_rank})
-		render_piece_at_tile(renderer, Piece_Type.Bishop, color, Vec2i{2,y_rank})
-		render_piece_at_tile(renderer, Piece_Type.Queen, color, Vec2i{3,y_rank})
-		render_piece_at_tile(renderer, Piece_Type.King, color, Vec2i{4,y_rank})
-		for x:i32 = 0;x <= 7;x += 1{
-			render_piece_at_tile(renderer, Piece_Type.Pawn, color, Vec2i{x, y_rank + 1})
+	render_starting_position :: proc(renderer: ^SDL.Renderer, cb: Chessboard_Info){
+		for square, i in cb.square_info{
+			index := 63 - i
+			render_piece_at_tile(renderer, square.piece_type, square.piece_color, Vec2i{cast(i32)index % 8, cast(i32)index / 8})
 		}
 	}
-	render_starting_position(renderer)
+	// render_starting_position :: proc(renderer: ^SDL.Renderer){
+	// 	SDL.RenderClear(renderer)
+
+	// 	y_rank:i32 = 7
+	// 	color := Piece_Color.White
+	// 	render_piece_at_tile(renderer, Piece_Type.Rook, color, Vec2i{0,y_rank})
+	// 	render_piece_at_tile(renderer, Piece_Type.Rook, color, Vec2i{7,y_rank})
+	// 	render_piece_at_tile(renderer, Piece_Type.Knight, color, Vec2i{1,y_rank})
+	// 	render_piece_at_tile(renderer, Piece_Type.Knight, color, Vec2i{6,y_rank})
+	// 	render_piece_at_tile(renderer, Piece_Type.Bishop, color, Vec2i{5,y_rank})
+	// 	render_piece_at_tile(renderer, Piece_Type.Bishop, color, Vec2i{2,y_rank})
+	// 	render_piece_at_tile(renderer, Piece_Type.Queen, color, Vec2i{3,y_rank})
+	// 	render_piece_at_tile(renderer, Piece_Type.King, color, Vec2i{4,y_rank})
+	// 	for x:i32 = 0;x <= 7;x += 1{
+	// 		render_piece_at_tile(renderer, Piece_Type.Pawn, color, Vec2i{x, y_rank - 1})
+	// 	}
+
+	// 	y_rank = 0
+	// 	color = Piece_Color.Black
+	// 	render_piece_at_tile(renderer, Piece_Type.Rook, color, Vec2i{0,y_rank})
+	// 	render_piece_at_tile(renderer, Piece_Type.Rook, color, Vec2i{7,y_rank})
+	// 	render_piece_at_tile(renderer, Piece_Type.Knight, color, Vec2i{1,y_rank})
+	// 	render_piece_at_tile(renderer, Piece_Type.Knight, color, Vec2i{6,y_rank})
+	// 	render_piece_at_tile(renderer, Piece_Type.Bishop, color, Vec2i{5,y_rank})
+	// 	render_piece_at_tile(renderer, Piece_Type.Bishop, color, Vec2i{2,y_rank})
+	// 	render_piece_at_tile(renderer, Piece_Type.Queen, color, Vec2i{3,y_rank})
+	// 	render_piece_at_tile(renderer, Piece_Type.King, color, Vec2i{4,y_rank})
+	// 	for x:i32 = 0;x <= 7;x += 1{
+	// 		render_piece_at_tile(renderer, Piece_Type.Pawn, color, Vec2i{x, y_rank + 1})
+	// 	}
+	// }
+	render_starting_position(renderer, cb)
 
 	SDL.SetRenderTarget(renderer, nil)
 
@@ -887,6 +938,15 @@ all_windows :: proc(ctx: ^mu.Context) {
 			fmt.eprintln("Mouse over chess square: ", rune('a'+tile_x), tile_y+1)
 			state.ui_ctx.hovered_square = Vec2i{tile_x, tile_y}
 		}
+		else{
+			mu.layout_next(ctx)
+		}
+		mu.layout_height(ctx, 5)
+		mu.layout_next(ctx)
+		mu.layout_row(ctx, {-1}, -5)
+		mu.begin_panel(ctx, "Moves")
+		mu.text(ctx, "Hello")
+		mu.end_panel(ctx)
 	}
 	if mu.window(ctx, "Open file", {200, 50, 400, 400}){
 		mu.layout_row(ctx, {-1}, -28)
