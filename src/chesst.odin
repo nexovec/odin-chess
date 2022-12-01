@@ -269,6 +269,21 @@ main :: proc() {
 		}
 	}
 	render_starting_position(renderer)
+
+	chessboard_highlights_tex := SDL.CreateTexture(renderer, format, SDL.TextureAccess(access), w, h)
+	textures["ChessboardHighlights"] = chessboard_highlights_tex
+	SDL.SetRenderTarget(renderer, chessboard_highlights_tex)
+	SDL.SetTextureBlendMode(chessboard_highlights_tex, .BLEND)
+	SDL.RenderClear(renderer)
+	coords := Vec2i{2,1}
+	tile_size := state.ui_ctx.chessboard_resolution/8
+	SDL.SetRenderDrawColor(renderer, 0, 0, 0, 0)
+	SDL.RenderClear(renderer)
+	SDL.SetRenderDrawColor(renderer, 200, 100, 100, 255)
+	SDL.RenderFillRect(renderer, &{coords.x * tile_size, coords.y * tile_size, tile_size, tile_size})
+	SDL.SetRenderDrawColor(renderer, 0, 0, 0, 0)
+	SDL.RenderFillRect(renderer, &{coords.x * tile_size + 8, coords.y * tile_size + 8, tile_size - 16, tile_size - 16})
+
 	SDL.SetRenderTarget(renderer, nil)
 
 	ctx := &state.mu_ctx
@@ -277,7 +292,7 @@ main :: proc() {
 	ctx.text_width = mu.default_atlas_text_width
 	ctx.text_height = mu.default_atlas_text_height
 
-	lastTick:i32=0
+	lastTick:i32 = 0
 	when RUN_TESTS{
 		run_tests()
 	}
@@ -424,7 +439,9 @@ render :: proc(ctx: ^mu.Context, renderer: ^SDL.Renderer) {
 	mx, my:i32
 	SDL.GetMouseState(&mx, &my)
 	piece_size := state.ui_ctx.piece_resolution
+	// mu.draw_image(ctx, "MouseLabel", {mx, my, state.ui_ctx.piece_resolution, state.ui_ctx.piece_resolution})
 	SDL.RenderCopy(renderer, textures["MouseLabel"], nil, &{mx, my, state.ui_ctx.piece_resolution, state.ui_ctx.piece_resolution})
+
 	SDL.RenderPresent(renderer)
 }
 
@@ -851,6 +868,8 @@ all_windows :: proc(ctx: ^mu.Context) {
 		mu.layout_next(ctx)
 		rect := mu.layout_next(ctx)
 		mu.draw_image(ctx, "Chessboard", rect)
+		// SDL.RenderCopy(renderer, textures["MouseLabel"], nil, &{mx, my, state.ui_ctx.piece_resolution, state.ui_ctx.piece_resolution})
+		mu.draw_image(ctx, "ChessboardHighlights", rect)
 		mu.draw_image(ctx, "Pieces", rect)
 		if mu.mouse_over(ctx, rect){
 			mu.text(ctx, "Test text")
