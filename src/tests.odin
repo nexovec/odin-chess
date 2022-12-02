@@ -729,9 +729,10 @@ Qxd7+ Kf8 21. Qd8# 1-0`
 	{
 		input := Square_Info_Full{{.Pawn, .White}, {3,1}}
 		moves := make([dynamic]Chess_Move_Full, 0, 6, context.temp_allocator)
-		get_unrestricted_moves_of_piece(input, moves)
+		defer delete(moves)
+		get_unrestricted_moves_of_piece(input, &moves)
 		// fmt.eprintln("moves:", len(moves))
 		// TODO:
-		// assert(len(moves) == 4, fmt.tprintf("moves:", moves))
+		assert(len(moves) == 4, fmt.tprintf("moves:", &moves))
 	}
 }

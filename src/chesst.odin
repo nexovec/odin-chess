@@ -98,7 +98,7 @@ Chess_Move_Full :: struct{
 	piece_color: Piece_Color
 }
 
-get_unrestricted_moves_of_piece :: proc(mv :Square_Info_Full, moves:[dynamic]Chess_Move_Full) -> [dynamic]Chess_Move_Full{
+get_unrestricted_moves_of_piece :: proc(mv :Square_Info_Full, moves:^[dynamic]Chess_Move_Full) -> ^[dynamic]Chess_Move_Full{
 	// TODO: test
 	moves:=moves
 	move := Chess_Move_Full{}
@@ -113,20 +113,20 @@ get_unrestricted_moves_of_piece :: proc(mv :Square_Info_Full, moves:[dynamic]Che
 			is_w := !is_b
 			if mv.x > 0{
 				move.dst = {mv.x-1, mv.y-u8(is_b)+u8(is_w)}
-				append(&moves, move)
+				append(moves, move)
 			}
 			if mv.y < 7{
 				move.dst = {mv.x+1, mv.y-u8(is_b)+u8(is_w)}
-				append(&moves, move)
+				append(moves, move)
 			}
 			move.dst = {mv.x, mv.y-u8(is_b)+u8(is_w)}
-			append(&moves, move)
+			append(moves, move)
 			if mv.y == 1 && is_w{
 				move.dst = {mv.x, mv.y+2}
-				append(&moves, move)
+				append(moves, move)
 			}else if mv.y == 6 && is_b{
 				move.dst = {mv.x, mv.y-2}
-				append(&moves, move)
+				append(moves, move)
 			}
 			if is_b && mv.y == 1{
 				// TODO: unpack the existing moves
@@ -138,19 +138,19 @@ get_unrestricted_moves_of_piece :: proc(mv :Square_Info_Full, moves:[dynamic]Che
 		case .Rook:
 			for i:u8=0; i<mv.x; i+=1{
 				move.dst = {i, mv.y}
-				append(&moves, move)
+				append(moves, move)
 			}
 			for i:u8=0; i<mv.y; i+=1{
 				move.dst = {mv.x, i}
-				append(&moves, move)
+				append(moves, move)
 			}
 			for i:u8=mv.x+1; i<8; i+=1{
 				move.dst = {i, mv.y}
-				append(&moves, move)
+				append(moves, move)
 			}
 			for i:u8=mv.y+1; i<8; i+=1{
 				move.dst = {mv.x, i}
-				append(&moves, move)
+				append(moves, move)
 			}
 		case .Knight:
 			c:=[]Chess_Coordinate{
@@ -166,25 +166,25 @@ get_unrestricted_moves_of_piece :: proc(mv :Square_Info_Full, moves:[dynamic]Che
 			for p in c{
 				if p.x<8 && p.y<8{
 					move.dst = p
-					append(&moves, move)
+					append(moves, move)
 				}
 			}
 		case .Bishop:
 			for i:u8=1; mv.x+i<8 && mv.y + i<8; i+=1{
 				move.dst = {mv.x+i, mv.y+i}
-				append(&moves, move)
+				append(moves, move)
 			}
 			for i:u8=1; mv.x-i<8 && mv.y + i<8; i+=1{
 				move.dst = {mv.x-i, mv.y+i}
-				append(&moves, move)
+				append(moves, move)
 			}
 			for i:u8=1; mv.x+i<8 && mv.y-i<8; i+=1{
 				move.dst = {mv.x+i, mv.y-i}
-				append(&moves, move)
+				append(moves, move)
 			}
 			for i:u8=1; mv.x-i<8 && mv.y-i<8; i+=1{
 				move.dst = {mv.x-i, mv.y-i}
-				append(&moves, move)
+				append(moves, move)
 			}
 		case .King:
 			c:=[]Chess_Coordinate{
@@ -200,7 +200,7 @@ get_unrestricted_moves_of_piece :: proc(mv :Square_Info_Full, moves:[dynamic]Che
 			for p in c{
 				if p.x<8 && p.y<8{
 					move.dst = p
-					append(&moves, move)
+					append(moves, move)
 				}
 			}
 			// Q: if I destroy a slice, but it was a dynamic array that I took a slice of, does it deallocate properly?
@@ -210,35 +210,35 @@ get_unrestricted_moves_of_piece :: proc(mv :Square_Info_Full, moves:[dynamic]Che
 			// get_unrestricted_moves_of_piece(mv, moves)
 			for i:u8=0; i<mv.x; i+=1{
 				move.dst = {i, mv.y}
-				append(&moves, move)
+				append(moves, move)
 			}
 			for i:u8=0; i<mv.y; i+=1{
 				move.dst = {mv.x, i}
-				append(&moves, move)
+				append(moves, move)
 			}
 			for i:u8=mv.x+1; i<8; i+=1{
 				move.dst = {i, mv.y}
-				append(&moves, move)
+				append(moves, move)
 			}
 			for i:u8=mv.y+1; i<8; i+=1{
 				move.dst = {mv.x, i}
-				append(&moves, move)
+				append(moves, move)
 			}
 			for i:u8=1; mv.x+i<8 && mv.y + i<8; i+=1{
 				move.dst = {mv.x+i, mv.y+i}
-				append(&moves, move)
+				append(moves, move)
 			}
 			for i:u8=1; mv.x-i<8 && mv.y + i<8; i+=1{
 				move.dst = {mv.x-i, mv.y+i}
-				append(&moves, move)
+				append(moves, move)
 			}
 			for i:u8=1; mv.x+i<8 && mv.y-i<8; i+=1{
 				move.dst = {mv.x+i, mv.y-i}
-				append(&moves, move)
+				append(moves, move)
 			}
 			for i:u8=1; mv.x-i<8 && mv.y-i<8; i+=1{
 				move.dst = {mv.x-i, mv.y-i}
-				append(&moves, move)
+				append(moves, move)
 			}
 	}
 	return moves
