@@ -477,9 +477,6 @@ main :: proc() {
 	ctx.text_height = mu.default_atlas_text_height
 
 	lastTick:i32 = 0
-	when RUN_TESTS{
-		run_tests()
-	}
 	main_loop: for {
 		for e: SDL.Event; SDL.PollEvent(&e);{
 			#partial switch e.type {

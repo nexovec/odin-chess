@@ -1,485 +1,14 @@
 package main
 import bufio "core:bufio"
+import c "core:c"
 import "core:reflect"
-// import io "core:io"
+import io "core:io"
+import testing "core:testing"
 import strings "core:strings"
 import fmt "core:fmt"
-// import io "core:io"
+import "core:runtime"
 import "core:strconv"
 
-/* reads a delimited move(without annotations) from the string, doesn't consume the delimiter, result is NULL terminated*/
-consume_delimited_move :: proc(
-	reader: ^bufio.Reader,
-	move_string_backing_buffer: ^[5]byte,
-) -> (
-	[]byte,
-	bool,
-) {
-	i := 0
-	// {
-	// 	data,err:=bufio.reader_peek(reader, 7)
-	// 	fmt.eprintln(transmute(string)data, err)
-	// }
-	for i < 6 {
-		c, err := bufio.reader_read_byte(reader)
-		if err == .EOF {
-			return move_string_backing_buffer[:i], true
-		}
-		if err != .None {
-			return move_string_backing_buffer[:0], false
-		}
-		switch c {
-		case '[':
-			bufio.reader_unread_byte(reader)
-			return move_string_backing_buffer[:], false
-		case ' ', '\t', '\r', '\n', '#', '+', '{', '(':
-			if i==0{
-				break
-			}
-			bufio.reader_unread_byte(reader)
-			return move_string_backing_buffer[:i], true
-		}
-		if i==5{
-			fmt.eprintln(err, rune(c))
-			panic("This isn't supposed to happen")
-		}
-		move_string_backing_buffer[i] = c
-		i += 1
-	}
-	return move_string_backing_buffer[:0], false
-}
-
-get_piece_type_from_pgn_character :: proc(
-	character: byte,
-) -> (
-	piece_type: Piece_Type,
-	success: bool = true,
-) {
-	switch character {
-	case 'R':
-		piece_type = .Rook
-	case 'N':
-		piece_type = .Knight
-	case 'B':
-		piece_type = .Bishop
-	case 'K':
-		piece_type = .King
-	case 'Q':
-		piece_type = .Queen
-	case 'a' ..= 'h':
-		piece_type = .Pawn
-	case:
-		success = false
-	}
-	return
-}
-parse_half_move_from_pgn :: proc(
-	reader: ^bufio.Reader,
-) -> (
-	move: PGN_Half_Move = {},
-	success: bool = false,
-) {
-	buf: [5]byte = {}
-	move_bytes, consume_success := consume_delimited_move(reader, &buf)
-	// assert(consume_success, transmute(string)move_bytes)
-	if !consume_success{
-		return
-	}
-	move_string := cast(string)move_bytes
-
-	// castling
-	if move_string == "O-O-O"{
-		move.is_qside_castles = true
-	}else if move_string == "O-O"{
-		move.is_kside_castles = true
-	}
-	if move.is_kside_castles || move.is_qside_castles{
-		success = true
-		return
-	}
-
-	// move parsing
-	s: bool
-	move.piece_type, s = get_piece_type_from_pgn_character(move_bytes[0])
-	if s == false {
-		return
-	}
-	if len(move_string) == 2 {
-		// fmt.eprintln("casual pawn move")
-		if move.piece_type != .Pawn {
-			return
-		}
-		move.dest_x = move_string[0]
-		move.dest_y = move_string[1]
-	} else if len(move_string) == 3 {
-		if move.piece_type == .Pawn {
-			return
-		}
-		// fmt.eprintln("casual piece move")
-		move.dest_x = move_string[1]
-		move.dest_y = move_string[2]
-	} else if len(move_string) == 4 {
-		#partial switch move.piece_type {
-		case .Pawn:
-			if move_string[1] != 'x' {
-				return
-			}
-			move.src_x = move_string[0]
-			move.known_src_column = true
-			move.dest_x = move_string[2]
-			move.dest_y = move_string[3]
-		case:
-			switch move_string[1] {
-			case 'a' ..= 'h':
-				move.known_src_column = true
-				move.src_y = move_string[1]
-			case '1' ..= '8':
-				move.known_src_row = true
-				move.src_x = move_string[1]
-			case 'x':
-			case:
-				return
-			}
-			move.dest_x = move_string[2]
-			move.dest_y = move_string[3]
-		}
-		// fmt.println(move.piece_type, "takes on", rune(move.dest_x), rune(move.dest_y))
-	} else if len(move_string) == 5 {
-		if move_string[2] != 'x' {
-			return
-		}
-		switch move_string[1] {
-		case 'a' ..= 'h':
-			move.known_src_column = true
-		case '1' ..= '8':
-			move.known_src_row = true
-		case:
-			return
-		}
-		move.dest_x = move_string[3]
-		move.dest_y = move_string[4]
-		// fmt.println(move.piece_type, " long form takes on", rune(move.dest_x), rune(move.dest_y))
-	} else {
-		panic("This is impossible.")
-	}
-	success = true
-	return
-}
-reader_read_integer :: proc(reader: ^bufio.Reader) -> (result: u16 = 0, success:bool=false) {
-	// TODO: test for `000x` kind of strings
-	buf: [dynamic]byte = make([dynamic]byte, 0, context.temp_allocator)
-	reading: for {
-		b, err_read := bufio.reader_read_byte(reader)
-		if err_read == .EOF{
-			break reading
-		}
-		else if err_read != .None{
-			return
-		}
-		switch b {
-		case '0' ..= '9':
-			append(&buf, b)
-		case:
-			err := bufio.reader_unread_byte(reader)
-			assert(err == .None)
-			break reading
-		}
-	}
-	if len(buf) == 0 {
-		return
-	} else {
-		success = true
-		s:=transmute(string)buf[:]
-		result = u16(strconv.atoi(s))
-		assert(result!=0) // TODO: it should work with zero, but not where I'm using it.
-	}
-	return
-}
-Move_Number :: distinct u16
-PGN_Metadata :: struct{
-	key:string,
-	value:string
-}
-Empty_Line :: distinct struct{}
-
-// VITAL NOTE: the following is coupled together, MAKE SURE they go in the same order.
-PGN_Parser_Token :: union{
-	Move_Number,
-	PGN_Half_Move,
-	Chess_Result,
-	PGN_Metadata,
-	Empty_Line
-}
-PGN_Parser_Token_Type :: enum u16{
-	None,
-	Move_Number,
-	PGN_Half_Move,
-	Chess_Result,
-	PGN_Metadata,
-	Empty_Line
-}
-
-PGN_Parsing_Error :: enum{
-	Unspecified,
-	None,
-	Couldnt_Read,
-	Syntax_Error
-}
-
-// NOTE: it consumes the thing if it contains the thing. It returns the first match.
-reader_startswith :: proc(reader: ^bufio.Reader, compared_strings:[]string) -> (index_of_match:int, success:bool){
-	// detect results
-
-	for result_string, index_of_result_string in compared_strings{
-		bytes, err := bufio.reader_peek(reader, len(result_string))
-		text := transmute(string)bytes
-		if text == result_string{
-			for i:=0; i<len(text); i+=1{
-				bufio.reader_read_byte(reader)
-			}
-			success = true
-			index_of_match = index_of_result_string
-			return
-		}
-		if err==.EOF{
-			continue
-		}
-		else if err != .None{
-			return
-		}
-	}
-	return
-}
-
-parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, e:PGN_Parsing_Error){
-	// skip an optional space, return Empty_Line if there's an empty line
-	bytes, err := bufio.reader_peek(reader, 1)
-	if err != .None{
-		e = .Couldnt_Read
-		return
-	}
-	c := bytes[0]
-	if c == '\r'{
-		bufio.reader_read_byte(reader)
-		result, e = parse_pgn_token(reader)
-		return
-	}
-	switch c{
-		case ' ':
-			bufio.reader_read_byte(reader)
-		case '\n':
-			bufio.reader_read_byte(reader)
-			l, err := bufio.reader_peek(reader,1)
-
-			if err == .None{
-				counter:=0
-				if l[counter] == '\r'{
-					l, err = bufio.reader_peek(reader, 2)
-					if err!=.None{
-						return
-					}
-					counter+=1
-				}
-				if l[counter] == '\n'{
-					counter+=1
-					for ;counter!=0;counter-=1{
-						bufio.reader_read_byte(reader)
-					}
-					result = Empty_Line{}
-					e = .None
-					return
-				}
-			}
-	}
-	result_strings := []string{"1-0", "0-1", "1/2-1/2"}
-	corresponding_val := []Chess_Result{.White_Won, .Black_Won, .Draw}
-
-	i, s := reader_startswith(reader, result_strings)
-	if s{
-		e = .None
-		result = corresponding_val[i]
-		return
-	}
-
-	// detect move number
-	move_number, read_success := reader_read_integer(reader)
-	if read_success{
-		c, err = bufio.reader_read_byte(reader)
-		e = .None
-		if err !=.None || c!='.'{
-			e = .Syntax_Error
-		}
-		result = cast(Move_Number)move_number
-		return
-	}
-
-	// detect half moves
-	move, read := parse_half_move_from_pgn(reader)
-	if read{
-		opt_move_postfix, err_postfix:=bufio.reader_read_byte(reader)
-		result = move
-		e = .None
-		if err_postfix == .EOF{
-			return
-		}
-		else if err_postfix!=.None{
-			e = .Couldnt_Read
-			return
-		}
-		switch opt_move_postfix{
-			case '\r':
-				// fmt.eprintln("There it goes")
-				fallthrough
-			case ' ', '\n', '\t':
-				bufio.reader_unread_byte(reader)
-			case '{', '(':
-				panic("Found a variant/commentary")
-			case '+':
-				move.is_check = true
-				// fmt.eprintln("Found a check/mate")
-			case '#':
-				move.is_mate = true
-			case:
-				// fmt.eprintln("unknown postfix", opt_move_postfix)
-				e = .Syntax_Error
-				return
-		}
-		return
-	}
-
-	// parse metadata
-	b, _ := bufio.reader_read_byte(reader)
-	if b != '['{
-		bufio.reader_unread_byte(reader)
-		return
-	}
-	// fmt.eprintln("parsing metadata")
-	key_bytes := make([dynamic]byte, 0)
-	for {
-		c, c_err := bufio.reader_read_byte(reader)
-		if c_err != .None{
-			e = .Couldnt_Read
-			return
-		}
-		if c == ' '{
-			break
-		}
-		append(&key_bytes, c)
-	}
-	{
-		c, c_err := bufio.reader_read_byte(reader)
-		if c_err != .None{
-			e = .Couldnt_Read
-			return
-		}
-		if c != '\"'{
-			e = .Syntax_Error
-			return
-		}
-	}
-	val_bytes := make([dynamic]byte,0)
-	for {
-		c, c_err := bufio.reader_read_byte(reader)
-		if c_err != .None{
-			e = .Couldnt_Read
-			return
-		}
-		if c == '"'{
-			break
-		}
-		append(&val_bytes, c)
-	}
-	{
-		val_c, val_c_err := bufio.reader_read_byte(reader)
-		if val_c_err != .None{
-			e = .Couldnt_Read
-			return
-		}
-		if val_c != ']'{
-			e = .Syntax_Error
-			return
-		}
-		result = PGN_Metadata{
-			key=transmute(string)key_bytes[:],
-			value=transmute(string)val_bytes[:]
-		}
-			e = .None
-	}
-	return
-}
-
-PGN_Parsed_Game :: struct{
-	metadatas:[dynamic]PGN_Metadata,
-	moves:[dynamic]PGN_Half_Move,
-	result:Chess_Result
-}
-parse_full_game_from_pgn :: proc(reader:^bufio.Reader, no_metadata:bool=false) -> (game: PGN_Parsed_Game = {}, success: bool){
-	token_types::bit_set[PGN_Parser_Token_Type]
-	expected:=token_types{.PGN_Metadata}
-	if no_metadata{
-		expected=token_types{.Move_Number}
-	}
-	pgn_parsed_game_init :: proc(game: ^PGN_Parsed_Game){
-		game.metadatas=make([dynamic]PGN_Metadata,0)
-		game.moves=make([dynamic]PGN_Half_Move,0)
-		game.result=Chess_Result.Undecided
-	}
-	pgn_parsed_game_destroy :: proc(game: ^PGN_Parsed_Game){
-		delete_dynamic_array(game.metadatas)
-		delete_dynamic_array(game.moves)
-	}
-	pgn_parsed_game_init(&game)
-	second_half_move:bool
-	for{
-		// {
-		// 	bytes, _ := bufio.reader_peek(reader, 40)
-		// 	fmt.eprintln(transmute(string) bytes)
-		// }
-		token, token_read:=parse_pgn_token(reader)
-		if token_read != .None{
-			fmt.eprintln("Couldn't read token,", token_read)
-			break
-		}
-		// fmt.eprintln(token)
-		raw_tag:=reflect.get_union_variant_raw_tag(token)
-		tag:=transmute(PGN_Parser_Token_Type)cast(u16)raw_tag
-		if tag == PGN_Parser_Token_Type.None{
-			panic("This is a bug, report to developer!")
-		}
-		if tag not_in expected{
-			fmt.eprintln("It was this.", tag, expected)
-			success = false
-			break
-		}
-		// fmt.eprintln(token)
-		switch t in token{
-			case Move_Number:
-				expected=token_types{.PGN_Half_Move}
-			case PGN_Half_Move:
-				append(&game.moves, t)
-				if second_half_move{
-					expected=token_types{.Chess_Result, .Move_Number}
-					second_half_move=false
-				}else{
-					expected=token_types{.Chess_Result, .PGN_Half_Move}
-					second_half_move=true
-				}
-			case Chess_Result:
-				game.result = t
-				success = true
-				return
-			case PGN_Metadata:
-				// unimplemented()
-				append(&game.metadatas,t)
-				expected=token_types{.Empty_Line, .PGN_Metadata}
-			case Empty_Line:
-				// unimplemented("Currently only a single game of moves with no metadata can be parsed, so this is redundant for now")
-				expected=token_types{.Move_Number}
-		}
-	}
-	// pgn_parsed_game_destroy(&game)
-	return
-}
 reader_init_from_string :: proc(
 	sample_string: string,
 	string_reader: ^strings.Reader,
@@ -489,8 +18,10 @@ reader_init_from_string :: proc(
 	bufio.reader_destroy(reader)
 	bufio.reader_init(reader, r)
 }
-run_tests :: proc() {
+@(test)
+run_tests :: proc(_: ^testing.T) {
 	fmt.println("RUNNING TESTS")
+	runtime.debug_trap()
 	r: bufio.Reader
 	defer bufio.reader_destroy(&r)
 	string_reader: strings.Reader
@@ -643,12 +174,34 @@ run_tests :: proc() {
 		}
 		{
 			pgn_sample:=`[Event "Valencia Casual Games"]`
-			fmt.eprintln(pgn_sample)
 			reader_init_from_string(pgn_sample, &string_reader, &r)
-			// game, success:=parse_full_game_from_pgn(&r)
 			data, err:=parse_pgn_token(&r)
 			assert(err==.None, fmt.tprintln(data))
 			fmt.eprintln("TEST metadata parsing successful")
+		}
+		{
+			test_name := "Variant parsing"
+			reader_init_from_string("(something)", &string_reader, &r)
+			did_consume, did_err := strip_variations(&r)
+			assert(!did_err, fmt.tprintln(test_name, "encountered a reading error"))
+			assert(did_consume, fmt.tprintln(test_name, "failed"))
+			fmt.eprintln("TEST variants parsing successful")
+		}
+		{
+			test_name := "Comment parsing"
+			reader_init_from_string("{something}", &string_reader, &r)
+			did_consume, did_err := strip_variations(&r)
+			assert(!did_err, fmt.tprintln(test_name, "encountered a reading error"))
+			assert(did_consume, fmt.tprintln(test_name, "failed"))
+			fmt.eprintln("TEST comments parsing successful")
+		}
+		{
+			test_name := "Comment in variant parsing"
+			reader_init_from_string("(something{something})", &string_reader, &r)
+			did_consume, did_err := strip_variations(&r)
+			assert(!did_err, fmt.tprintln(test_name, "encountered a reading error"))
+			assert(did_consume, fmt.tprintln(test_name, "failed"))
+			fmt.eprintln("TEST comments parsing successful")
 		}
 	}
 	{
@@ -726,13 +279,12 @@ Qxd7+ Kf8 21. Qd8# 1-0`
 			fmt.eprintln("TEST full pgn game parsing successful")
 		}
 	}
-	{
-		input := Square_Info_Full{{.Pawn, .White}, {3,1}}
-		moves := make([dynamic]Chess_Move_Full, 0, 6, context.temp_allocator)
-		defer delete(moves)
-		get_unrestricted_moves_of_piece(input, &moves)
-		// fmt.eprintln("moves:", len(moves))
-		// TODO:
-		assert(len(moves) == 4, fmt.tprintf("moves:", &moves))
-	}
+}
+@(test)
+getting_potential_moves :: proc(_: ^testing.T){
+	input := Square_Info_Full{{.Pawn, .White}, {3,1}}
+	moves := make([dynamic]Chess_Move_Full, 0, 6, context.temp_allocator)
+	defer delete(moves)
+	get_unrestricted_moves_of_piece(input, &moves)
+	assert(len(moves) == 4, fmt.tprintf("moves:", &moves, len(moves)))
 }
