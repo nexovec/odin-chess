@@ -143,20 +143,22 @@ pgn_half_move_parsing :: proc(^testing.T){
 
 @(test)
 parsing_pgn_tokens :: proc(^testing.T){
-	parse_token_from_string_test::proc(reader:^bufio.Reader, string_reader: ^strings.Reader, thing:string)->PGN_Parser_Token{
+	parse_token_from_string_test::proc(reader:^bufio.Reader, string_reader: ^strings.Reader, thing:string, expected_err: PGN_Parsing_Error = .None)->PGN_Parser_Token{
 		reader_init_from_string(thing, string_reader, reader)
 		// skip_characters_in_set_strings_variant(&r, skipped_strings[:])
 		token, err := parse_pgn_token(reader)
-		assert(err == .None, fmt.tprintln(token))
+		assert(err == expected_err, fmt.tprintln(token))
 		fmt.eprintln("Parsing full moves works")
 		return token
 	}
 	_=parse_token_from_string_test(&r, &string_reader, `1.`).(Move_Number)
-	fmt.eprintln("TEST parsing move numbers as tokens successful")
+	fmt.eprintln("TEST parsing .pgn move numbers as tokens successful")
 	_=parse_token_from_string_test(&r, &string_reader, `1-0`).(Chess_Result)
-	fmt.eprintln("TEST parsing chess results as tokens successful")
+	fmt.eprintln("TEST parsing .pgn chess results as tokens successful")
 	parse_token_from_string_test(&r, &string_reader, `e4`)
-	fmt.eprintln("TEST parsing chess moves as tokens successful")
+	fmt.eprintln("TEST parsing .pgn chess moves as tokens successful")
+	parse_token_from_string_test(&r, &string_reader, `$32`, .Couldnt_Read)
+	fmt.eprintln("TEST parsing pgn chess move descriptor as tokens successful")
 
 	{
 		reader_init_from_string(`1. e4 d5 1/2-1/2ok`, &string_reader, &r)
@@ -203,7 +205,15 @@ parsing_pgn_tokens :: proc(^testing.T){
 		did_consume, did_err := strip_variations(&r)
 		assert(!did_err, fmt.tprintln(test_name, "encountered a reading error"))
 		assert(did_consume, fmt.tprintln(test_name, "failed"))
-		fmt.eprintln("TEST comments parsing successful")
+		fmt.eprintln("TEST coments in variants parsing successful")
+	}
+	{
+		test_name := "Nested variants parsing"
+		reader_init_from_string("(something(something{something}))", &string_reader, &r)
+		did_consume, did_err := strip_variations(&r)
+		assert(!did_err, fmt.tprintln(test_name, "encountered a reading error"))
+		assert(did_consume, fmt.tprintln(test_name, "failed"))
+		fmt.eprintln("TEST coments in variants parsing successful")
 	}
 }
 

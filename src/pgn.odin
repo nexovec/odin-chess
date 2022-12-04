@@ -194,9 +194,10 @@ reader_read_integer :: proc(reader: ^bufio.Reader) -> (result: u16 = 0, success:
 	return
 }
 Move_Number :: distinct u16
+PGN_Move_Descriptor :: distinct u16
 PGN_Metadata :: struct{
 	key:string,
-	value:string
+	value:string,
 }
 Empty_Line :: distinct struct{}
 
@@ -206,22 +207,25 @@ PGN_Parser_Token :: union{
 	PGN_Half_Move,
 	Chess_Result,
 	PGN_Metadata,
-	Empty_Line
+	Empty_Line,
+	PGN_Move_Descriptor,
 }
+
 PGN_Parser_Token_Type :: enum u16{
 	None,
 	Move_Number,
 	PGN_Half_Move,
 	Chess_Result,
 	PGN_Metadata,
-	Empty_Line
+	Empty_Line,
+	PGN_Move_Descriptor,
 }
 
 PGN_Parsing_Error :: enum{
 	Unspecified,
 	None,
 	Couldnt_Read,
-	Syntax_Error
+	Syntax_Error,
 }
 
 // NOTE: it consumes the thing if it contains the thing. It returns the first match.
@@ -230,7 +234,7 @@ reader_startswith :: proc(reader: ^bufio.Reader, compared_strings:[]string) -> (
 
 	for result_string, index_of_result_string in compared_strings{
 		bytes, err := bufio.reader_peek(reader, len(result_string))
-		text := transmute(string)bytes
+		text := transmute(string)bytes // for debugging only
 		if text == result_string{
 			for i:=0; i<len(text); i+=1{
 				bufio.reader_read_byte(reader)
@@ -254,7 +258,7 @@ strip_variations :: proc(reader: ^bufio.Reader) -> (did_consume: bool, did_err: 
 	for{
 		t, err := bufio.reader_read_byte(reader)
 		disp := [?]byte{t}
-		char:=transmute(string)disp[:]
+		text := transmute(string)disp[:] // for debugging only
 		if err == .EOF{
 			if nested_count != 0{
 				did_err = true
@@ -294,44 +298,79 @@ strip_variations :: proc(reader: ^bufio.Reader) -> (did_consume: bool, did_err: 
 
 parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, e:PGN_Parsing_Error){
 	// skip an optional space, return Empty_Line if there's an empty line
-	bytes, err := bufio.reader_peek(reader, 1)
-	if err != .None{
-		e = .Couldnt_Read
-		return
-	}
-	c := bytes[0]
-	if c == '\r'{
-		bufio.reader_read_byte(reader)
-		result, e = parse_pgn_token(reader)
-		return
-	}
-	switch c{
-		case ' ':
+	{
+		bytes, err := bufio.reader_peek(reader, 1)
+		if err != .None{
+			e = .Couldnt_Read
+			return
+		}
+		c := bytes[0]
+		if c == '\r'{
 			bufio.reader_read_byte(reader)
-		case '\n':
-			bufio.reader_read_byte(reader)
-			l, err := bufio.reader_peek(reader,1)
-
-			if err == .None{
-				counter:=0
-				if l[counter] == '\r'{
-					l, err = bufio.reader_peek(reader, 2)
-					if err!=.None{
+			result, e = parse_pgn_token(reader)
+			return
+		}
+		switch c{
+			case ' ':
+				bufio.reader_read_byte(reader)
+			case '\n':
+				bufio.reader_read_byte(reader)
+				l, err := bufio.reader_peek(reader,1)
+				if err == .None{
+					counter:=0
+					if l[counter] == '\r'{
+						l, err = bufio.reader_peek(reader, 2)
+						if err!=.None{
+							return
+						}
+						counter+=1
+					}
+					if l[counter] == '\n'{
+						counter+=1
+						for ;counter!=0;counter-=1{
+							bufio.reader_read_byte(reader)
+						}
+						result = Empty_Line{}
+						e = .None
 						return
 					}
-					counter+=1
 				}
-				if l[counter] == '\n'{
-					counter+=1
-					for ;counter!=0;counter-=1{
-						bufio.reader_read_byte(reader)
-					}
-					result = Empty_Line{}
-					e = .None
+		}
+	}
+
+	// strip move descriptors
+	{
+		bytes, err := bufio.reader_peek(reader, 1)
+		if err != .None{
+			e = .Couldnt_Read
+			return
+		}
+		c := bytes[0]
+		if c == '$'{
+			result = PGN_Move_Descriptor{}
+			displayed: string = "" // for debugging only
+			for c != ' ' && c != '\r' && c != '\n' && c != '\t'{
+				c, err = bufio.reader_read_byte(reader)
+				slice := []byte{c}
+				displayed = transmute(string)slice
+				if err != .None && err != .EOF{
+					e = PGN_Parsing_Error.Couldnt_Read
+					return
+				}else if err == .EOF{
+					e = PGN_Parsing_Error.Couldnt_Read
 					return
 				}
 			}
+			err = bufio.reader_unread_byte(reader)
+			if err != .None{
+				panic("This should be impossible")
+			}
+			result = PGN_Move_Descriptor{}
+			e = .None
+			return
+		}
 	}
+
 	// strip variations(and comments, for now)
 	did_consume, did_err := strip_variations(reader)
 	if did_err{
@@ -356,12 +395,26 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, e:PG
 	// detect move number
 	move_number, read_success := reader_read_integer(reader)
 	if read_success{
-		c, err = bufio.reader_read_byte(reader)
+		c, err := bufio.reader_read_byte(reader)
 		e = .None
-		if err !=.None || c!='.'{
+		if err !=.None || c != '.'{
 			e = .Syntax_Error
 		}
 		result = cast(Move_Number)move_number
+
+		// check for continuation sequence
+		/* There are sometimes characters to exclaim which move a second half move falls into, especially after a long
+		variation or comment. It looks something like this: `variant ends here) 9... Nxe5`*/
+		// HACK
+		// We currently just strip this. I hope I will not have to have a separate token type for this thing
+		bytes: []byte
+		bytes, err = bufio.reader_peek(reader, 2)
+		if transmute(string)bytes == ".."{
+			// this is a continuation sequence, skipping
+			bufio.reader_read_byte(reader)
+			bufio.reader_read_byte(reader)
+			return parse_pgn_token(reader)
+		}
 		return
 	}
 
@@ -484,49 +537,55 @@ parse_full_game_from_pgn :: proc(reader:^bufio.Reader, no_metadata:bool=false) -
 	second_half_move:bool
 	for{
 		// {
-		// 	bytes, _ := bufio.reader_peek(reader, 40)
+		// 	bytes, _ := bufio.reader_peek(reader, 128)
 		// 	fmt.eprintln(transmute(string) bytes)
 		// }
-		token, token_read:=parse_pgn_token(reader)
+		token, token_read := parse_pgn_token(reader)
 		if token_read != .None{
 			fmt.eprintln("Couldn't read token,", token_read)
 			break
 		}
 		// fmt.eprintln(token)
-		raw_tag:=reflect.get_union_variant_raw_tag(token)
-		tag:=transmute(PGN_Parser_Token_Type)cast(u16)raw_tag
+		raw_tag := reflect.get_union_variant_raw_tag(token)
+		tag := transmute(PGN_Parser_Token_Type)cast(u16)raw_tag
 		if tag == PGN_Parser_Token_Type.None{
 			panic("This is a bug, report to developer!")
 		}
 		if tag not_in expected{
-			fmt.eprintln("It was this.", tag, expected)
+			fmt.eprintln(args = {"Unexpected token type: <actual, expected>", tag, expected}, sep = ", ")
 			success = false
 			break
 		}
 		// fmt.eprintln(token)
 		switch t in token{
 			case Move_Number:
-				expected=token_types{.PGN_Half_Move}
+				expected = token_types{.PGN_Half_Move}
 			case PGN_Half_Move:
 				append(&game.moves, t)
 				if second_half_move{
-					expected=token_types{.Chess_Result, .Move_Number}
+					expected = token_types{.Chess_Result, .Move_Number, .PGN_Move_Descriptor}
 					second_half_move=false
 				}else{
-					expected=token_types{.Chess_Result, .PGN_Half_Move}
+					expected = token_types{.Chess_Result, .PGN_Half_Move, .PGN_Move_Descriptor}
 					second_half_move=true
 				}
 			case Chess_Result:
+				// assumes there can be no move descriptor, annotation or comment following the game result
 				game.result = t
 				success = true
 				return
 			case PGN_Metadata:
-				// unimplemented()
 				append(&game.metadatas,t)
-				expected=token_types{.Empty_Line, .PGN_Metadata}
+				expected = token_types{.Empty_Line, .PGN_Metadata}
+            case PGN_Move_Descriptor:
+                if second_half_move{
+					expected = token_types{.PGN_Half_Move, .Chess_Result, .PGN_Move_Descriptor}
+				}else{
+					expected = token_types{.Move_Number, .Chess_Result, .PGN_Move_Descriptor}
+				}
+				fmt.eprintln("found a move descriptor")
 			case Empty_Line:
-				// unimplemented("Currently only a single game of moves with no metadata can be parsed, so this is redundant for now")
-				expected=token_types{.Move_Number}
+				expected = token_types{.Move_Number}
 		}
 	}
 	// pgn_parsed_game_destroy(&game)

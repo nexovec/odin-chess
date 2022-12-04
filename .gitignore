@@ -1,5 +1,6 @@
 data/ignored/
 **.pdb
 **.exe
+src/**.obj
 
 .vs
