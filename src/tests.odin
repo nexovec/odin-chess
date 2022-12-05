@@ -85,6 +85,9 @@ string_skipping :: proc(^testing.T){
 		reader_init_from_string(`1/2-1/21-0ok`, &string_reader, &r)
 		skip_characters_in_set_strings_variant(&r, skipped_strings[:])
 		data, err := bufio.reader_peek(&r, 2)
+		if err!=.None {
+			panic("Got an error")
+		}
 		ok_maybe := transmute(string)data
 		assert(ok_maybe == "ok", "test failed")
 		fmt.eprintln("Works when you use multiple different delimiters")
