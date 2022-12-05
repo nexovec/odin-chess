@@ -17,13 +17,15 @@ UI_Context :: struct{
 	held_piece: Piece_Type,
 	piece_resolution: i32,
 	chessboard_resolution: i32,
-	hovered_square: Vec2i
+	hovered_square: Vec2i,
+	chessboard_square_mask_green:[64]bool
 }
 default_ui_ctx := UI_Context{
 	.Pawn,
 	64,
 	1024,
-	{0,0}
+	{0,0},
+	{}
 }
 state := struct {
 	mu_ctx:          mu.Context,
@@ -626,16 +628,36 @@ render :: proc(ctx: ^mu.Context, renderer: ^SDL.Renderer) {
 	chessboard_highlights_tex := textures["ChessboardHighlights"]
 	SDL.SetRenderTarget(renderer, chessboard_highlights_tex)
 	SDL.RenderClear(renderer)
-	coords := state.ui_ctx.hovered_square
 	tile_size := state.ui_ctx.chessboard_resolution/8
 	SDL.SetRenderDrawColor(renderer, 0, 0, 0, 0)
 	SDL.RenderClear(renderer)
-	SDL.SetRenderDrawColor(renderer, 200, 100, 100, 255)
-	SDL.RenderFillRect(renderer, &{coords.x * tile_size, (7 - coords.y) * (tile_size), tile_size, tile_size})
-	SDL.SetRenderDrawColor(renderer, 0, 0, 0, 0)
-	SDL.RenderFillRect(renderer, &{coords.x * tile_size + 8, (7 - coords.y) * tile_size + 8, tile_size - 16, tile_size - 16})
-	SDL.SetRenderTarget(renderer, nil)
+	render_rect :: proc(renderer: ^SDL.Renderer, coords: Vec2i, tile_size: i32) {
+		SDL.RenderFillRect(renderer, &{coords.x * tile_size, (7 - coords.y) * (tile_size), tile_size, tile_size})
+	}
+	render_rect_hole :: proc(renderer: ^SDL.Renderer, coords: Vec2i, tile_size: i32){
+		SDL.RenderFillRect(renderer, &{coords.x * tile_size + 8, (7 - coords.y) * tile_size + 8, tile_size - 16, tile_size - 16})
+	}
+	// DEBUG:
+	state.ui_ctx.chessboard_square_mask_green[16] = true
 
+	SDL.SetRenderDrawColor(renderer, 100, 200, 100, 255)
+	for square_active, index in state.ui_ctx.chessboard_square_mask_green{
+		if square_active{
+			render_rect(renderer, Vec2i{i32(index%8), i32(index/8)}, tile_size)
+		}
+	}
+	SDL.SetRenderDrawColor(renderer, 0, 0, 0, 0)
+	for square_active, index in state.ui_ctx.chessboard_square_mask_green{
+		if square_active{
+			render_rect_hole(renderer, Vec2i{i32(index%8), i32(index/8)}, tile_size)
+		}
+	}
+	SDL.SetRenderDrawColor(renderer, 200, 100, 100, 255)
+	render_rect(renderer, state.ui_ctx.hovered_square, tile_size)
+	SDL.SetRenderDrawColor(renderer, 0, 0, 0, 0)
+	render_rect_hole(renderer, state.ui_ctx.hovered_square, tile_size)
+
+	SDL.SetRenderTarget(renderer, nil)
 	SDL.RenderPresent(renderer)
 }
 
