@@ -87,7 +87,7 @@ Chess_Coordinate :: struct{
 }
 
 Square_Info_Full :: struct{
-	using square: Piece_Info,
+	using piece: Piece_Info,
 	using coord: Chess_Coordinate
 }
 
@@ -249,7 +249,7 @@ get_unrestricted_moves_of_piece :: proc(mv :Square_Info_Full, moves:^[dynamic]Ch
 render_chessboard_position :: proc(renderer: ^SDL.Renderer, cb: Chessboard_Info){
 	for square, i in cb.square_info{
 		index := 63 - i
-		render_piece_at_tile(renderer, square.piece_type, square.piece_color, Vec2i{cast(i32)index % 8, cast(i32)index / 8})
+		render_piece_at_tile(renderer, square.piece_type, square.piece_color, Vec2i{7 - cast(i32)index % 8, cast(i32)index / 8})
 	}
 }
 
@@ -550,23 +550,16 @@ main :: proc() {
 				SDL.RenderFillRect(renderer, &{coords.x * tile_size + 8, (7 - coords.y) * tile_size + 8, tile_size - 16, tile_size - 16})
 			}
 
-			// // DEBUG:
-
 			// set mask for all plausible moves
-			// state.loaded_game
 			if state.loaded_game != nil{
-				state.ui_ctx.chessboard_square_mask_green[16] = true
 				moves := make([dynamic]Chess_Move_Full, 0, 32)
 				basic_position := default_chessboard_info()
-				for piece, index in basic_position.square_info{
-					if piece.piece_type == .None{
-						continue
-					}
-					x, y :u8 = cast(u8)index%8, cast(u8)index/8
-					square_info := Square_Info_Full{square=piece,coord={x,y}}
-					get_unrestricted_moves_of_piece(square_info, &moves)
-					break
-				}
+				coord := state.ui_ctx.hovered_square
+				square := Square_Info_Full{}
+				square.coord = {cast(u8)coord.x, cast(u8)coord.y}
+				square.piece = basic_position.square_info[coord.y * 8 + coord.x]
+				get_unrestricted_moves_of_piece(square, &moves)
+				state.ui_ctx.chessboard_square_mask_green = {}
 				for move in moves{
 					state.ui_ctx.chessboard_square_mask_green[move.dst.y * 8 + move.dst.x] = true
 				}
