@@ -19,7 +19,6 @@ UI_Context :: struct{
 	chessboard_resolution: i32,
 	hovered_square: Vec2i,
 	chessboard_square_mask_green:[64]bool,
-	loaded_game: ^PGN_Parsed_Game
 }
 default_ui_ctx := UI_Context{
 	{.Pawn, .Black},
@@ -27,11 +26,11 @@ default_ui_ctx := UI_Context{
 	1024,
 	{0,0},
 	{},
-	nil
 }
 state := struct {
 	mu_ctx:          mu.Context,
 	ui_ctx:			 UI_Context,
+	loaded_game:^PGN_Parsed_Game,
 	log_buf:         [1 << 16]byte,
 	log_buf_len:     int,
 	log_buf_updated: bool,
@@ -41,7 +40,8 @@ state := struct {
 } {
 	bg = {90, 95, 100, 255},
 	sdl_wsize = Vec2i{960, 540},
-	ui_ctx = default_ui_ctx
+	ui_ctx = default_ui_ctx,
+	// loaded_game=nil
 }
 
 MU_PROPERTIES := struct{
@@ -104,7 +104,6 @@ Chess_Move_Full :: struct{
 
 get_unrestricted_moves_of_piece :: proc(mv :Square_Info_Full, moves:^[dynamic]Chess_Move_Full) -> ^[dynamic]Chess_Move_Full{
 	// TODO: test
-	moves:=moves
 	move := Chess_Move_Full{}
 	move.piece_color = mv.piece_color
 	move.piece_type = mv.piece_type
@@ -252,6 +251,37 @@ render_chessboard_position :: proc(renderer: ^SDL.Renderer, cb: Chessboard_Info)
 		index := 63 - i
 		render_piece_at_tile(renderer, square.piece_type, square.piece_color, Vec2i{cast(i32)index % 8, cast(i32)index / 8})
 	}
+}
+
+place_piece :: proc(cbinfo: ^Chessboard_Info, x: u8, y: u8, piece: Piece_Info){
+	cbinfo.square_info[x+8*y] = piece
+}
+
+default_chessboard_info :: proc() -> Chessboard_Info{
+	cbinfo := Chessboard_Info{}
+	place_piece(&cbinfo, 7, 7, {.Rook,.Black})
+	place_piece(&cbinfo, 0, 7, {.Rook,.Black})
+	place_piece(&cbinfo, 1, 7, {.Knight,.Black})
+	place_piece(&cbinfo, 6, 7, {.Knight,.Black})
+	place_piece(&cbinfo, 2, 7, {.Bishop,.Black})
+	place_piece(&cbinfo, 5, 7, {.Bishop,.Black})
+	place_piece(&cbinfo, 3, 7, {.Queen,.Black})
+	place_piece(&cbinfo, 4, 7, {.King,.Black})
+	place_piece(&cbinfo, 7, 0, {.Rook,.White})
+	place_piece(&cbinfo, 0, 0, {.Rook,.White})
+	place_piece(&cbinfo, 1, 0, {.Knight,.White})
+	place_piece(&cbinfo, 6, 0, {.Knight,.White})
+	place_piece(&cbinfo, 2, 0, {.Bishop,.White})
+	place_piece(&cbinfo, 5, 0, {.Bishop,.White})
+	place_piece(&cbinfo, 3, 0, {.Queen,.White})
+	place_piece(&cbinfo, 4, 0, {.King,.White})
+	for i:u8=0; i<8;i+=1{
+		place_piece(&cbinfo, i, 6, {.Pawn, .Black})
+	}
+	for i:u8=0; i<8;i+=1{
+		place_piece(&cbinfo, i, 1, {.Pawn, .White})
+	}
+	return cbinfo
 }
 
 main :: proc() {
@@ -421,37 +451,6 @@ main :: proc() {
 	SDL.SetRenderDrawColor(renderer, 255, 255, 255, 255)
 	// SDL.RenderClear(renderer)
 
-
-	place_piece :: proc(cbinfo: ^Chessboard_Info, x: u8, y: u8, piece: Piece_Info){
-		cbinfo.square_info[x+8*y] = piece
-	}
-	default_chessboard_info :: proc() -> Chessboard_Info{
-		cbinfo := Chessboard_Info{}
-		place_piece(&cbinfo, 7, 7, {.Rook,.Black})
-		place_piece(&cbinfo, 0, 7, {.Rook,.Black})
-		place_piece(&cbinfo, 1, 7, {.Knight,.Black})
-		place_piece(&cbinfo, 6, 7, {.Knight,.Black})
-		place_piece(&cbinfo, 2, 7, {.Bishop,.Black})
-		place_piece(&cbinfo, 5, 7, {.Bishop,.Black})
-		place_piece(&cbinfo, 3, 7, {.Queen,.Black})
-		place_piece(&cbinfo, 4, 7, {.King,.Black})
-		place_piece(&cbinfo, 7, 0, {.Rook,.White})
-		place_piece(&cbinfo, 0, 0, {.Rook,.White})
-		place_piece(&cbinfo, 1, 0, {.Knight,.White})
-		place_piece(&cbinfo, 6, 0, {.Knight,.White})
-		place_piece(&cbinfo, 2, 0, {.Bishop,.White})
-		place_piece(&cbinfo, 5, 0, {.Bishop,.White})
-		place_piece(&cbinfo, 3, 0, {.Queen,.White})
-		place_piece(&cbinfo, 4, 0, {.King,.White})
-		for i:u8=0; i<8;i+=1{
-			place_piece(&cbinfo, i, 6, {.Pawn, .Black})
-		}
-		for i:u8=0; i<8;i+=1{
-			place_piece(&cbinfo, i, 1, {.Pawn, .White})
-		}
-		return cbinfo
-	}
-
 	// draw hovered piece
 	render_piece(renderer, state.ui_ctx.held_piece, &{0, 0, state.ui_ctx.piece_resolution, state.ui_ctx.piece_resolution})
 
@@ -531,6 +530,68 @@ main :: proc() {
 		SDL.RenderClear(renderer)
 		render_chessboard_position(renderer, cb)
 		SDL.SetRenderTarget(renderer, nil)
+
+		// drawing chessboard highlights
+		{
+			mx, my:i32
+			SDL.GetMouseState(&mx, &my)
+			SDL.RenderCopy(renderer, textures["MouseLabel"], nil, &{mx, my, state.ui_ctx.piece_resolution, state.ui_ctx.piece_resolution})
+
+			chessboard_highlights_tex := textures["ChessboardHighlights"]
+			SDL.SetRenderTarget(renderer, chessboard_highlights_tex)
+			SDL.RenderClear(renderer)
+			tile_size := state.ui_ctx.chessboard_resolution/8
+			SDL.SetRenderDrawColor(renderer, 0, 0, 0, 0)
+			SDL.RenderClear(renderer)
+			render_rect :: proc(renderer: ^SDL.Renderer, coords: Vec2i, tile_size: i32) {
+				SDL.RenderFillRect(renderer, &{coords.x * tile_size, (7 - coords.y) * (tile_size), tile_size, tile_size})
+			}
+			render_rect_hole :: proc(renderer: ^SDL.Renderer, coords: Vec2i, tile_size: i32){
+				SDL.RenderFillRect(renderer, &{coords.x * tile_size + 8, (7 - coords.y) * tile_size + 8, tile_size - 16, tile_size - 16})
+			}
+
+			// // DEBUG:
+
+			// set mask for all plausible moves
+			// state.loaded_game
+			if state.loaded_game != nil{
+				state.ui_ctx.chessboard_square_mask_green[16] = true
+				moves := make([dynamic]Chess_Move_Full, 0, 32)
+				basic_position := default_chessboard_info()
+				for piece, index in basic_position.square_info{
+					if piece.piece_type == .None{
+						continue
+					}
+					x, y :u8 = cast(u8)index%8, cast(u8)index/8
+					square_info := Square_Info_Full{square=piece,coord={x,y}}
+					get_unrestricted_moves_of_piece(square_info, &moves)
+					break
+				}
+				for move in moves{
+					state.ui_ctx.chessboard_square_mask_green[move.dst.y * 8 + move.dst.x] = true
+				}
+			}
+
+			// render green chessboard highlights from mask
+			SDL.SetRenderDrawColor(renderer, 100, 200, 100, 255)
+			for square_active, index in state.ui_ctx.chessboard_square_mask_green{
+				if square_active{
+					render_rect(renderer, Vec2i{i32(index%8), i32(index/8)}, tile_size)
+				}
+			}
+			SDL.SetRenderDrawColor(renderer, 0, 0, 0, 0)
+			for square_active, index in state.ui_ctx.chessboard_square_mask_green{
+				if square_active{
+					render_rect_hole(renderer, Vec2i{i32(index%8), i32(index/8)}, tile_size)
+				}
+			}
+			SDL.SetRenderDrawColor(renderer, 200, 100, 100, 255)
+			render_rect(renderer, state.ui_ctx.hovered_square, tile_size)
+			SDL.SetRenderDrawColor(renderer, 0, 0, 0, 0)
+			render_rect_hole(renderer, state.ui_ctx.hovered_square, tile_size)
+
+			SDL.SetRenderTarget(renderer, nil)
+		}
 
 		mu.begin(ctx)
 		all_windows(ctx)
@@ -617,48 +678,6 @@ render :: proc(ctx: ^mu.Context, renderer: ^SDL.Renderer) {
 			unreachable()
 		}
 	}
-	mx, my:i32
-	SDL.GetMouseState(&mx, &my)
-	SDL.RenderCopy(renderer, textures["MouseLabel"], nil, &{mx, my, state.ui_ctx.piece_resolution, state.ui_ctx.piece_resolution})
-
-	chessboard_highlights_tex := textures["ChessboardHighlights"]
-	SDL.SetRenderTarget(renderer, chessboard_highlights_tex)
-	SDL.RenderClear(renderer)
-	tile_size := state.ui_ctx.chessboard_resolution/8
-	SDL.SetRenderDrawColor(renderer, 0, 0, 0, 0)
-	SDL.RenderClear(renderer)
-	render_rect :: proc(renderer: ^SDL.Renderer, coords: Vec2i, tile_size: i32) {
-		SDL.RenderFillRect(renderer, &{coords.x * tile_size, (7 - coords.y) * (tile_size), tile_size, tile_size})
-	}
-	render_rect_hole :: proc(renderer: ^SDL.Renderer, coords: Vec2i, tile_size: i32){
-		SDL.RenderFillRect(renderer, &{coords.x * tile_size + 8, (7 - coords.y) * tile_size + 8, tile_size - 16, tile_size - 16})
-	}
-	// // DEBUG:
-	state.ui_ctx.chessboard_square_mask_green[16] = true
-
-	// set mask for all plausible moves
-	if state.ui_ctx.loaded_game != nil{
-		asked_move := state.ui_ctx.loaded_game.moves[0]
-		state.ui_ctx.chessboard_square_mask_green[asked_move.dest_x + asked_move.dest_y * 8] = true
-	}
-	SDL.SetRenderDrawColor(renderer, 100, 200, 100, 255)
-	for square_active, index in state.ui_ctx.chessboard_square_mask_green{
-		if square_active{
-			render_rect(renderer, Vec2i{i32(index%8), i32(index/8)}, tile_size)
-		}
-	}
-	SDL.SetRenderDrawColor(renderer, 0, 0, 0, 0)
-	for square_active, index in state.ui_ctx.chessboard_square_mask_green{
-		if square_active{
-			render_rect_hole(renderer, Vec2i{i32(index%8), i32(index/8)}, tile_size)
-		}
-	}
-	SDL.SetRenderDrawColor(renderer, 200, 100, 100, 255)
-	render_rect(renderer, state.ui_ctx.hovered_square, tile_size)
-	SDL.SetRenderDrawColor(renderer, 0, 0, 0, 0)
-	render_rect_hole(renderer, state.ui_ctx.hovered_square, tile_size)
-
-	SDL.SetRenderTarget(renderer, nil)
 	SDL.RenderPresent(renderer)
 }
 
@@ -751,8 +770,9 @@ skip_characters_in_set :: proc(reader:^bufio.Reader, chars:[$T]u8)->(did_consume
 	return
 }
 
-nav_menu_open_file::proc(filepath:string="data/small.pgn") -> (games: [dynamic]PGN_Parsed_Game){
-	games = make([dynamic]PGN_Parsed_Game, 0)
+nav_menu_open_file::proc(filepath:string="data/small.pgn") -> (games: ^[dynamic]PGN_Parsed_Game){
+	games_dynarray := make([dynamic]PGN_Parsed_Game, 0,32)
+	games = &games_dynarray
 	splits := strings.split(filepath,".")
 	extension:=splits[len(splits)-1]
 	if extension != "pgn"{
@@ -806,7 +826,7 @@ nav_menu_open_file::proc(filepath:string="data/small.pgn") -> (games: [dynamic]P
 		}
 		thing,_:=bufio.reader_peek(&reader, 15)
 		fmt.eprintln("I have loaded a game, next bytes:",transmute(string)thing)
-		append(&games, game)
+		append(games, game)
 		token, token_success := parse_pgn_token(&reader)
 		_, conversion_ok := token.(Empty_Line)
 		if token_success != .None || !conversion_ok{
@@ -880,11 +900,8 @@ all_windows :: proc(ctx: ^mu.Context) {
 			}
 			if .SUBMIT in mu.button(ctx, "Import"){
 				games := nav_menu_open_file()
-				// TODO: represent position after each move
-				// TODO: find all plausible moves
-				// TODO: higlight plausible moves
 				if len(games) > 0{
-					state.ui_ctx.loaded_game = &games[0]
+					state.loaded_game = &games[0]
 				}
 			}
 			mu.button(ctx, "Export")
@@ -1123,7 +1140,10 @@ all_windows :: proc(ctx: ^mu.Context) {
 		mu.begin_panel(ctx, "File name")
 		mu.end_panel(ctx)
 		if .SUBMIT in mu.button(ctx, "Import"){
-			nav_menu_open_file()
+			games := nav_menu_open_file()
+			if len(games) > 0{
+				state.loaded_game = &games[0]
+			}
 		}
 	}
 }
