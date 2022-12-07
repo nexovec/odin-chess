@@ -464,47 +464,6 @@ main :: proc() {
 	ctx.text_width = mu.default_atlas_text_width
 	ctx.text_height = mu.default_atlas_text_height
 
-	//constructing chessboard state after each move
-	// FIXME:
-	games := nav_menu_open_file()
-	sample_game := games[0]
-
-	chessboard_states := make([dynamic]Chessboard_Info, 0)
-	append(&chessboard_states, default_chessboard_info())
-
-	move_buffer := make([dynamic]Chess_Move_Full, 0)
-	for move, index in sample_game.moves{
-		fmt.eprintln("move: ", index)
-		state_before_move := chessboard_states[index]
-
-		state_after_move := state_before_move
-		// modify the state
-		traversing_squares: for contents, square_index in state_after_move.square_info{
-			if contents.piece_type == .None{
-				continue
-			}
-			if contents.piece_type == move.piece_type{
-				// FIXME: color of the piece matters and is not accounted for yet
-				// FIXME: wrong if there's multiple pieces that can move to the same square
-				square_info := Square_Info_Full{}
-				square_info.piece = contents
-				square_info.x = cast(u8)square_index % 8
-				square_info.y = cast(u8)square_index / 8
-				moves_possible_from_square := get_unrestricted_moves_of_piece(square_info, &move_buffer)
-				dst := Chess_Coordinate{move.dest_x, move.dest_y}
-				for move_possible in moves_possible_from_square{
-					if move_possible.dst == dst{
-						state_after_move.square_info[dst.x + dst.y*8] = contents
-						state_after_move.square_info[square_index] = Square_Info_Full{}
-						append(&chessboard_states, state_after_move)
-						break traversing_squares
-					}
-				}
-			}
-		}
-		resize(&move_buffer, 0)
-	}
-
 	lastTick:i32 = 0
 	main_loop: for {
 		for e: SDL.Event; SDL.PollEvent(&e);{
@@ -1158,8 +1117,24 @@ all_windows :: proc(ctx: ^mu.Context) {
 		else{
 			mu.layout_next(ctx)
 		}
-		mu.layout_height(ctx, 5)
-		mu.layout_next(ctx)
+		mu.layout_row(ctx, {30, 30, 30, 30, -1})
+		mu.layout_height(ctx, 20)
+		first_mv_btn := mu.button(ctx, "<<")
+		prev_mv_btn := mu.button(ctx, "<")
+		next_mv_btn := mu.button(ctx, ">")
+		last_mv_btn := mu.button(ctx, ">>")
+		if .SUBMIT in first_mv_btn{
+			mu.text(ctx, "First move")
+		}
+		if .SUBMIT in prev_mv_btn{
+			mu.text(ctx, "Previous move")
+		}
+		if .SUBMIT in next_mv_btn{
+			mu.text(ctx, "Next move")
+		}
+		if .SUBMIT in last_mv_btn{
+			mu.text(ctx, "Last move")
+		}
 		mu.layout_row(ctx, {-1}, -5)
 		mu.begin_panel(ctx, "Moves")
 		mu.text(ctx, "Hello")

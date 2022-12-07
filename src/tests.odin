@@ -9,8 +9,63 @@ import fmt "core:fmt"
 import "core:runtime"
 import "core:strconv"
 
+
+@(private="file")
 r: bufio.Reader
+@(private="file")
 string_reader: strings.Reader
+
+@(private="file")
+sample_pgn_strings := []string{
+	`[Event "Valencia Casual Games"]
+[Site "Valencia"]
+[Date "1475.??.??"]
+[Round "?"]
+[White "De Castellvi, Francisco"]
+[Black "Vinoles, Narcisco"]
+[Result "1-0"]
+[ECO "B01"]
+[PlyCount "41"]
+[EventDate "1475.??.??"]
+[EventType "game"]
+[EventCountry "ESP"]
+[SourceTitle "EXT 2008"]
+[Source "ChessBase"]
+[SourceDate "2007.11.25"]
+[SourceVersion "1"]
+[SourceVersionDate "2007.11.25"]
+[SourceQuality "1"]
+
+1. e4 d5 2. exd5 Qxd5 3. Nc3 Qd8 4. Bc4 Nf6 5. Nf3 Bg4 6. h3 Bxf3 7. Qxf3 e6 8.
+Qxb7 Nbd7 9. Nb5 Rc8 10. Nxa7 Nb6 11. Nxc8 Nxc8 12. d4 Nd6 13. Bb5+ Nxb5 14.
+Qxb5+ Nd7 15. d5 exd5 16. Be3 Bd6 17. Rd1 Qf6 18. Rxd5 Qg6 19. Bf4 Bxf4 20.
+Qxd7+ Kf8 21. Qd8# 1-0
+
+`,
+`[Event "Valencia Casual Games"]
+[Site "Valencia"]
+[Date "1475.??.??"]
+[Round "?"]
+[White "De Castellvi, Francisco"]
+[Black "Vinoles, Narcisco"]
+[Result "1-0"]
+[ECO "B01"]
+[PlyCount "41"]
+[EventDate "1475.??.??"]
+[EventType "game"]
+[EventCountry "ESP"]
+[SourceTitle "EXT 2008"]
+[Source "ChessBase"]
+[SourceDate "2007.11.25"]
+[SourceVersion "1"]
+[SourceVersionDate "2007.11.25"]
+[SourceQuality "1"]
+
+1. e4 d5 2. exd5 Qxd5 3. Nc3 Qd8 4. Bc4 Nf6 5. Nf3 Bg4 6. h3 Bxf3 7. Qxf3 e6 8.
+Qxb7 Nbd7 9. Nb5 Rc8 10. Nxa7 Nb6 11. Nxc8 Nxc8 12. d4 Nd6 13. Bb5+ Nxb5 14.
+Qxb5+ Nd7 15. d5 exd5 16. Be3 Bd6 17. Rd1 Qf6 18. Rxd5 Qg6 19. Bf4 Bxf4 20.
+Qxd7+ Kf8 21. Qd8# 1-0`
+}
 
 reader_init_from_string :: proc(
 	sample_string: string,
@@ -231,57 +286,7 @@ Qxd7+ Kf8 21. Qd8# 1-0`, &string_reader, &r)
 		assert(success==true, fmt.tprintln(game))
 		fmt.eprintln("TEST full moves portion parsing successful")
 	}
-	inputs:=[]string{
-		`[Event "Valencia Casual Games"]
-[Site "Valencia"]
-[Date "1475.??.??"]
-[Round "?"]
-[White "De Castellvi, Francisco"]
-[Black "Vinoles, Narcisco"]
-[Result "1-0"]
-[ECO "B01"]
-[PlyCount "41"]
-[EventDate "1475.??.??"]
-[EventType "game"]
-[EventCountry "ESP"]
-[SourceTitle "EXT 2008"]
-[Source "ChessBase"]
-[SourceDate "2007.11.25"]
-[SourceVersion "1"]
-[SourceVersionDate "2007.11.25"]
-[SourceQuality "1"]
-
-1. e4 d5 2. exd5 Qxd5 3. Nc3 Qd8 4. Bc4 Nf6 5. Nf3 Bg4 6. h3 Bxf3 7. Qxf3 e6 8.
-Qxb7 Nbd7 9. Nb5 Rc8 10. Nxa7 Nb6 11. Nxc8 Nxc8 12. d4 Nd6 13. Bb5+ Nxb5 14.
-Qxb5+ Nd7 15. d5 exd5 16. Be3 Bd6 17. Rd1 Qf6 18. Rxd5 Qg6 19. Bf4 Bxf4 20.
-Qxd7+ Kf8 21. Qd8# 1-0
-
-`,
-`[Event "Valencia Casual Games"]
-[Site "Valencia"]
-[Date "1475.??.??"]
-[Round "?"]
-[White "De Castellvi, Francisco"]
-[Black "Vinoles, Narcisco"]
-[Result "1-0"]
-[ECO "B01"]
-[PlyCount "41"]
-[EventDate "1475.??.??"]
-[EventType "game"]
-[EventCountry "ESP"]
-[SourceTitle "EXT 2008"]
-[Source "ChessBase"]
-[SourceDate "2007.11.25"]
-[SourceVersion "1"]
-[SourceVersionDate "2007.11.25"]
-[SourceQuality "1"]
-
-1. e4 d5 2. exd5 Qxd5 3. Nc3 Qd8 4. Bc4 Nf6 5. Nf3 Bg4 6. h3 Bxf3 7. Qxf3 e6 8.
-Qxb7 Nbd7 9. Nb5 Rc8 10. Nxa7 Nb6 11. Nxc8 Nxc8 12. d4 Nd6 13. Bb5+ Nxb5 14.
-Qxb5+ Nd7 15. d5 exd5 16. Be3 Bd6 17. Rd1 Qf6 18. Rxd5 Qg6 19. Bf4 Bxf4 20.
-Qxd7+ Kf8 21. Qd8# 1-0`
-	}
-	for pgn_sample in inputs{
+	for pgn_sample in sample_pgn_strings{
 		// fmt.eprintln(pgn_sample)
 		reader_init_from_string(pgn_sample, &string_reader, &r)
 		game, success:=parse_full_game_from_pgn(&r)
@@ -304,4 +309,55 @@ getting_potential_moves :: proc(_: ^testing.T){
 	defer delete(moves)
 	get_unrestricted_moves_of_piece(input, &moves)
 	assert(len(moves) == 4, fmt.tprintf("moves:", &moves, len(moves)))
+}
+
+@(test)
+/* Creates a list of chessboard states after performing each moves from a pgn */
+create_chess_positions :: proc(t: ^testing.T){
+	// FIXME:
+	sample_game_str := sample_pgn_strings[0]
+	reader_init_from_string(sample_game_str, &string_reader, &r)
+	sample_game, success := parse_full_game_from_pgn(&r)
+	assert(len(sample_game.moves)>0)
+
+	chessboard_states := make([dynamic]Chessboard_Info, 0)
+	append(&chessboard_states, default_chessboard_info())
+
+	move_buffer := make([dynamic]Chess_Move_Full, 0)
+	for move, index in sample_game.moves{
+		fmt.eprintln("move: ", index, move)
+		state_before_move := chessboard_states[index]
+
+		state_after_move := state_before_move
+		found_move := false
+		// modify the state
+		traversing_squares: for contents, square_index in state_after_move.square_info{
+			if contents.piece_type == .None{
+				continue
+			}
+			if contents.piece_type == move.piece_type{
+				// FIXME: color of the piece matters and is not accounted for yet
+				// FIXME: wrong if there's multiple pieces that can move to the same square
+				square_info := Square_Info_Full{}
+				square_info.piece = contents
+				square_info.x = cast(u8)square_index % 8
+				square_info.y = cast(u8)square_index / 8
+				moves_possible_from_square := get_unrestricted_moves_of_piece(square_info, &move_buffer)
+				dst := Chess_Coordinate{move.dest_x - 'a', move.dest_y-'0'}
+				for move_possible in moves_possible_from_square{
+					if move_possible.dst == dst{
+						state_after_move.square_info[dst.x + dst.y*8] = contents
+						state_after_move.square_info[square_index] = Square_Info_Full{}
+						append(&chessboard_states, state_after_move)
+						found_move = true
+						break traversing_squares
+					}
+				}
+			}
+		}
+		if !found_move{
+			panic(fmt.tprintln("Error on move:", index))
+		}
+		resize(&move_buffer, 0)
+	}
 }
