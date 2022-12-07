@@ -107,15 +107,13 @@ parse_half_move_from_pgn :: proc(
 		if move.piece_type != .Pawn {
 			return
 		}
-		move.dest_x = move_string[0]
-		move.dest_y = move_string[1]
+		move.dst = Chessboard_location{move_string[0] - 'a', move_string[1] - '0'}
 	} else if len(move_string) == 3 {
 		if move.piece_type == .Pawn {
 			return
 		}
 		// fmt.eprintln("casual piece move")
-		move.dest_x = move_string[1]
-		move.dest_y = move_string[2]
+		move.dst = Chessboard_location{move_string[1] - 'a', move_string[2] - '0'}
 	} else if len(move_string) == 4 {
 		#partial switch move.piece_type {
 		case .Pawn:
@@ -124,8 +122,7 @@ parse_half_move_from_pgn :: proc(
 			}
 			move.src_x = move_string[0]
 			move.known_src_column = true
-			move.dest_x = move_string[2]
-			move.dest_y = move_string[3]
+			move.dst = Chessboard_location{move_string[2] - 'a', move_string[3] - '0'}
 		case:
 			switch move_string[1] {
 			case 'a' ..= 'h':
@@ -138,8 +135,7 @@ parse_half_move_from_pgn :: proc(
 			case:
 				return
 			}
-			move.dest_x = move_string[2]
-			move.dest_y = move_string[3]
+			move.dst = Chessboard_location{move_string[2] - 'a', move_string[3] - '0'}
 		}
 		// fmt.println(move.piece_type, "takes on", rune(move.dest_x), rune(move.dest_y))
 	} else if len(move_string) == 5 {
@@ -154,8 +150,7 @@ parse_half_move_from_pgn :: proc(
 		case:
 			return
 		}
-		move.dest_x = move_string[3]
-		move.dest_y = move_string[4]
+		move.dst = Chessboard_location{move_string[3] - 'a', move_string[4] - '0'}
 		// fmt.println(move.piece_type, " long form takes on", rune(move.dest_x), rune(move.dest_y))
 	} else {
 		panic("This is impossible.")
@@ -506,7 +501,7 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, e:PG
 		}
 		result = PGN_Metadata{
 			key=transmute(string)key_bytes[:],
-			value=transmute(string)val_bytes[:]
+			value=transmute(string)val_bytes[:],
 		}
 			e = .None
 	}
@@ -516,7 +511,7 @@ parse_pgn_token :: proc(reader:^bufio.Reader) -> (result: PGN_Parser_Token, e:PG
 PGN_Parsed_Game :: struct{
 	metadatas:[dynamic]PGN_Metadata,
 	moves:[dynamic]PGN_Half_Move,
-	result:Chess_Result
+	result:Chess_Result,
 }
 parse_full_game_from_pgn :: proc(reader:^bufio.Reader, no_metadata:bool=false) -> (game: PGN_Parsed_Game = {}, success: bool){
 	token_types::bit_set[PGN_Parser_Token_Type]

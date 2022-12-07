@@ -36,7 +36,7 @@ state := struct {
 	log_buf_updated: bool,
 	bg:              mu.Color,
 	atlas_texture:   ^SDL.Texture,
-	sdl_wsize: Vec2i
+	sdl_wsize: Vec2i,
 } {
 	bg = {90, 95, 100, 255},
 	sdl_wsize = Vec2i{960, 540},
@@ -46,10 +46,10 @@ state := struct {
 
 MU_PROPERTIES := struct{
 	STATUS_BAR_HEIGHT: i32,
-	MENU_HEIGHT: i32
+	MENU_HEIGHT: i32,
 } {
 	STATUS_BAR_HEIGHT = 25,
-	MENU_HEIGHT = 30
+	MENU_HEIGHT = 30,
 }
 cb_image: ^SDL.Surface
 cb_texture: ^SDL.Texture
@@ -81,19 +81,19 @@ Chessboard_Info :: struct{
 	square_info: [64]Piece_Info,
 }
 
-Chess_Coordinate :: struct{
+Chessboard_location :: struct{
 	x: u8,
 	y: u8,
 }
 
 Square_Info_Full :: struct{
 	using piece: Piece_Info,
-	using coord: Chess_Coordinate,
+	using coord: Chessboard_location,
 }
 
 Chess_Move :: struct{
-	src: Chess_Coordinate,
-	dst: Chess_Coordinate,
+	src: Chessboard_location,
+	dst: Chessboard_location,
 }
 
 Chess_Move_Full :: struct{
@@ -154,7 +154,7 @@ get_unrestricted_moves_of_piece :: proc(mv :Square_Info_Full, moves:^[dynamic]Ch
 				append(moves, move)
 			}
 		case .Knight:
-			c:=[]Chess_Coordinate{
+			c:=[]Chessboard_location{
 				{mv.x+1, mv.y+2},
 				{mv.x+1, mv.y-2},
 				{mv.x-1, mv.y+2},
@@ -188,7 +188,7 @@ get_unrestricted_moves_of_piece :: proc(mv :Square_Info_Full, moves:^[dynamic]Ch
 				append(moves, move)
 			}
 		case .King:
-			c:=[]Chess_Coordinate{
+			c:=[]Chessboard_location{
 				{mv.x-1, mv.y+1},
 				{mv.x-1, mv.y},
 				{mv.x-1, mv.y-1},
@@ -833,12 +833,12 @@ Chess_Result :: enum u8{
 	Undecided,
 	White_Won,
 	Black_Won,
-	Draw
+	Draw,
 }
 
 Piece_Color :: enum u8{
 	Black,
-	White
+	White,
 }
 Piece_Type :: enum u8{
 	None,
@@ -855,13 +855,12 @@ PGN_Half_Move :: struct{
 	known_src_column:bool,
 	src_x:u8,
 	src_y:u8,
-	dest_x:u8,
-	dest_y:u8,
 	is_mate:bool,
 	is_check:bool,
 	is_prequalified:bool,
 	is_kside_castles:bool,
-	is_qside_castles:bool
+	is_qside_castles:bool,
+	dst:Chessboard_location,
 }
 
 all_windows :: proc(ctx: ^mu.Context) {

@@ -343,10 +343,9 @@ create_chess_positions :: proc(t: ^testing.T){
 				square_info.x = cast(u8)square_index % 8
 				square_info.y = cast(u8)square_index / 8
 				moves_possible_from_square := get_unrestricted_moves_of_piece(square_info, &move_buffer)
-				dst := Chess_Coordinate{move.dest_x - 'a', move.dest_y-'0'}
 				for move_possible in moves_possible_from_square{
-					if move_possible.dst == dst{
-						state_after_move.square_info[dst.x + dst.y*8] = contents
+					if move_possible.dst == move.dst{
+						state_after_move.square_info[move.dst.x + move.dst.y*8] = contents
 						state_after_move.square_info[square_index] = Square_Info_Full{}
 						append(&chessboard_states, state_after_move)
 						found_move = true
