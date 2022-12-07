@@ -14,10 +14,6 @@ consume_delimited_move :: proc(
 	bool,
 ) {
 	i := 0
-	// {
-	// 	data,err:=bufio.reader_peek(reader, 7)
-	// 	fmt.eprintln(transmute(string)data, err)
-	// }
 	for i < 6 {
 		c, err := bufio.reader_read_byte(reader)
 		if err == .EOF {
@@ -103,7 +99,6 @@ parse_half_move_from_pgn :: proc(
 		return
 	}
 	if len(move_string) == 2 {
-		// fmt.eprintln("casual pawn move")
 		if move.piece_type != .Pawn {
 			return
 		}
@@ -112,7 +107,6 @@ parse_half_move_from_pgn :: proc(
 		if move.piece_type == .Pawn {
 			return
 		}
-		// fmt.eprintln("casual piece move")
 		move.dst = Chessboard_location{move_string[1] - 'a', move_string[2] - '1'}
 	} else if len(move_string) == 4 {
 		#partial switch move.piece_type {
@@ -183,7 +177,8 @@ reader_read_integer :: proc(reader: ^bufio.Reader) -> (result: u16 = 0, success:
 		success = true
 		s := transmute(string)buf[:]
 		result = u16(strconv.atoi(s))
-		assert(result != 0) // TODO: it should work with zero, but not where I'm using it.
+		// NOTE: it should be able to be 0, but this function is currently only used in places where it 0 must never occur.
+		assert(result != 0)
 	}
 	return
 }
@@ -195,7 +190,7 @@ PGN_Metadata :: struct {
 }
 Empty_Line :: distinct struct {}
 
-// VITAL NOTE: the following is coupled together, MAKE SURE they go in the same order.
+// VITAL NOTE: the following union and enum are coupled together, MAKE SURE they go in the same respective order.
 PGN_Parser_Token :: union {
 	Move_Number,
 	PGN_Half_Move,
@@ -204,7 +199,6 @@ PGN_Parser_Token :: union {
 	Empty_Line,
 	PGN_Move_Descriptor,
 }
-
 PGN_Parser_Token_Type :: enum u16 {
 	None,
 	Move_Number,
@@ -230,11 +224,11 @@ reader_startswith :: proc(
 	index_of_match: int,
 	success: bool,
 ) {
-	// detect results
 
+	// detect results
 	for result_string, index_of_result_string in compared_strings {
 		bytes, err := bufio.reader_peek(reader, len(result_string))
-		text := transmute(string)bytes // for debugging only
+		text := transmute(string)bytes
 		if text == result_string {
 			for i := 0; i < len(text); i += 1 {
 				bufio.reader_read_byte(reader)
@@ -257,7 +251,6 @@ strip_variations :: proc(reader: ^bufio.Reader) -> (did_consume: bool, did_err: 
 	for {
 		t, err := bufio.reader_read_byte(reader)
 		disp := [?]byte{t}
-		text := transmute(string)disp[:] // for debugging only
 		if err == .EOF {
 			if nested_count != 0 {
 				did_err = true
@@ -272,7 +265,6 @@ strip_variations :: proc(reader: ^bufio.Reader) -> (did_consume: bool, did_err: 
 			for t != '}' {
 				err_c: io.Error
 				t, err_c = bufio.reader_read_byte(reader)
-				text := transmute(string)[]byte{t, 0}
 				if err_c != .None {
 					return did_consume, true
 				}
@@ -351,11 +343,9 @@ parse_pgn_token :: proc(
 		c := bytes[0]
 		if c == '$' {
 			result = PGN_Move_Descriptor{}
-			displayed: string = "" // for debugging only
 			for c != ' ' && c != '\r' && c != '\n' && c != '\t' {
 				c, err = bufio.reader_read_byte(reader)
 				slice := []byte{c}
-				displayed = transmute(string)slice
 				if err != .None && err != .EOF {
 					e = PGN_Parsing_Error.Couldnt_Read
 					return
@@ -544,16 +534,11 @@ parse_full_game_from_pgn :: proc(
 	pgn_parsed_game_init(&game)
 	second_half_move: bool
 	for {
-		// {
-		// 	bytes, _ := bufio.reader_peek(reader, 128)
-		// 	fmt.eprintln(transmute(string) bytes)
-		// }
 		token, token_read := parse_pgn_token(reader)
 		if token_read != .None {
 			fmt.eprintln("Couldn't read token,", token_read)
 			break
 		}
-		// fmt.eprintln(token)
 		raw_tag := reflect.get_union_variant_raw_tag(token)
 		tag := transmute(PGN_Parser_Token_Type)cast(u16)raw_tag
 		if tag == PGN_Parser_Token_Type.None {
@@ -567,7 +552,6 @@ parse_full_game_from_pgn :: proc(
 			success = false
 			break
 		}
-		// fmt.eprintln(token)
 		switch t in token {
 		case Move_Number:
 			expected = token_types{.PGN_Half_Move}
@@ -599,6 +583,5 @@ parse_full_game_from_pgn :: proc(
 			expected = token_types{.Move_Number}
 		}
 	}
-	// pgn_parsed_game_destroy(&game)
 	return
 }

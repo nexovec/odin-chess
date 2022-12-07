@@ -333,12 +333,11 @@ create_chess_positions :: proc(t: ^testing.T) {
 
 	move_buffer := make([dynamic]Chess_Move_Full, 0)
 	for move, index in sample_game.moves {
-		// fmt.eprintln("move: ", index, move)
 		state_before_move := chessboard_states[index]
 
 		state_after_move := state_before_move
 		found_move := false
-		// modify the state
+		// modify new state
 		traversing_squares: for contents, square_index in state_after_move.square_info {
 			if contents.piece_type != move.piece_type {
 				continue

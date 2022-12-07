@@ -35,7 +35,6 @@ state := struct {
 	bg = {90, 95, 100, 255},
 	sdl_wsize = Vec2i{960, 540},
 	ui_ctx = default_ui_ctx,
-	// loaded_game=nil
 }
 
 MU_PROPERTIES := struct {
@@ -495,7 +494,6 @@ main :: proc() {
 	SDL.SetTextureBlendMode(hovering_chess_piece_tex, SDL.BlendMode.BLEND)
 	SDL.SetRenderTarget(renderer, hovering_chess_piece_tex)
 	SDL.SetRenderDrawColor(renderer, 255, 255, 255, 255)
-	// SDL.RenderClear(renderer)
 
 	// draw hovered piece
 	render_piece(
@@ -722,9 +720,6 @@ render :: proc(ctx: ^mu.Context, renderer: ^SDL.Renderer) {
 				panic("Couldn't find texture")
 			}
 			rect := transmute(SDL.Rect)cmd.rect
-			// blend_mode:=SDL.BlendMode.BLEND
-			// SDL.SetTextureBlendMode(chosen_texture, blend_mode)
-
 			format: u32
 			access: i32
 			w, h: i32
@@ -889,12 +884,6 @@ nav_menu_open_file :: proc(
 			fmt.println("skipping BOM in PGN file, BOM has length of ", s)
 		}
 	}
-
-	// game, success := parse_full_game_from_pgn(&reader)
-	// if !success{
-	// 	things,_:=bufio.reader_peek(&reader, 30)
-	// 	fmt.eprintln(transmute(string)things)
-	// }
 	reader_loop: for {
 		game, success := parse_full_game_from_pgn(&reader)
 		if !success {
@@ -1199,7 +1188,6 @@ all_windows :: proc(ctx: ^mu.Context) {
 		mu.layout_next(ctx)
 		rect := mu.layout_next(ctx)
 		mu.draw_image(ctx, "Chessboard", rect)
-		// SDL.RenderCopy(renderer, textures["MouseLabel"], nil, &{mx, my, state.ui_ctx.piece_resolution, state.ui_ctx.piece_resolution})
 		mu.draw_image(ctx, "ChessboardHighlights", rect)
 		mu.draw_image(ctx, "Pieces", rect)
 		if mu.mouse_over(ctx, rect) {
@@ -1209,7 +1197,6 @@ all_windows :: proc(ctx: ^mu.Context) {
 			x, y := mx - rect.x, my - rect.y
 			tile_size := rect.w / 8
 			tile_x, tile_y: i32 = x / tile_size, 7 - y / tile_size
-			// fmt.eprintln("Mouse over chess square: ", rune('a'+tile_x), tile_y+1)
 			state.ui_ctx.hovered_square = Vec2i{tile_x, tile_y}
 		} else {
 			mu.layout_next(ctx)
