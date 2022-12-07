@@ -78,32 +78,31 @@ Piece_Info :: struct{
 }
 
 Chessboard_Info :: struct{
-	square_info: [64]Piece_Info
+	square_info: [64]Piece_Info,
 }
 
 Chess_Coordinate :: struct{
 	x: u8,
-	y: u8
+	y: u8,
 }
 
 Square_Info_Full :: struct{
 	using piece: Piece_Info,
-	using coord: Chess_Coordinate
+	using coord: Chess_Coordinate,
 }
 
 Chess_Move :: struct{
 	src: Chess_Coordinate,
-	dst: Chess_Coordinate
+	dst: Chess_Coordinate,
 }
 
 Chess_Move_Full :: struct{
 	using move:Chess_Move,
 	piece_type: Piece_Type,
-	piece_color: Piece_Color
+	piece_color: Piece_Color,
 }
 
 get_unrestricted_moves_of_piece :: proc(mv :Square_Info_Full, moves:^[dynamic]Chess_Move_Full) -> ^[dynamic]Chess_Move_Full{
-	// TODO: test
 	move := Chess_Move_Full{}
 	move.piece_color = mv.piece_color
 	move.piece_type = mv.piece_type
@@ -464,6 +463,47 @@ main :: proc() {
 
 	ctx.text_width = mu.default_atlas_text_width
 	ctx.text_height = mu.default_atlas_text_height
+
+	//constructing chessboard state after each move
+	// FIXME:
+	games := nav_menu_open_file()
+	sample_game := games[0]
+
+	chessboard_states := make([dynamic]Chessboard_Info, 0)
+	append(&chessboard_states, default_chessboard_info())
+
+	move_buffer := make([dynamic]Chess_Move_Full, 0)
+	for move, index in sample_game.moves{
+		fmt.eprintln("move: ", index)
+		state_before_move := chessboard_states[index]
+
+		state_after_move := state_before_move
+		// modify the state
+		traversing_squares: for contents, square_index in state_after_move.square_info{
+			if contents.piece_type == .None{
+				continue
+			}
+			if contents.piece_type == move.piece_type{
+				// FIXME: color of the piece matters and is not accounted for yet
+				// FIXME: wrong if there's multiple pieces that can move to the same square
+				square_info := Square_Info_Full{}
+				square_info.piece = contents
+				square_info.x = cast(u8)square_index % 8
+				square_info.y = cast(u8)square_index / 8
+				moves_possible_from_square := get_unrestricted_moves_of_piece(square_info, &move_buffer)
+				dst := Chess_Coordinate{move.dest_x, move.dest_y}
+				for move_possible in moves_possible_from_square{
+					if move_possible.dst == dst{
+						state_after_move.square_info[dst.x + dst.y*8] = contents
+						state_after_move.square_info[square_index] = Square_Info_Full{}
+						append(&chessboard_states, state_after_move)
+						break traversing_squares
+					}
+				}
+			}
+		}
+		resize(&move_buffer, 0)
+	}
 
 	lastTick:i32 = 0
 	main_loop: for {
