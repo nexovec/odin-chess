@@ -10,12 +10,12 @@ import "core:runtime"
 import "core:strconv"
 
 
-@(private="file")
+@(private = "file")
 r: bufio.Reader
-@(private="file")
+@(private = "file")
 string_reader: strings.Reader
 
-@(private="file")
+@(private = "file")
 sample_pgn_strings := []string{
 	`[Event "Valencia Casual Games"]
 [Site "Valencia"]
@@ -42,7 +42,7 @@ Qxb5+ Nd7 15. d5 exd5 16. Be3 Bd6 17. Rd1 Qf6 18. Rxd5 Qg6 19. Bf4 Bxf4 20.
 Qxd7+ Kf8 21. Qd8# 1-0
 
 `,
-`[Event "Valencia Casual Games"]
+	`[Event "Valencia Casual Games"]
 [Site "Valencia"]
 [Date "1475.??.??"]
 [Round "?"]
@@ -64,7 +64,7 @@ Qxd7+ Kf8 21. Qd8# 1-0
 1. e4 d5 2. exd5 Qxd5 3. Nc3 Qd8 4. Bc4 Nf6 5. Nf3 Bg4 6. h3 Bxf3 7. Qxf3 e6 8.
 Qxb7 Nbd7 9. Nb5 Rc8 10. Nxa7 Nb6 11. Nxc8 Nxc8 12. d4 Nd6 13. Bb5+ Nxb5 14.
 Qxb5+ Nd7 15. d5 exd5 16. Be3 Bd6 17. Rd1 Qf6 18. Rxd5 Qg6 19. Bf4 Bxf4 20.
-Qxd7+ Kf8 21. Qd8# 1-0`
+Qxd7+ Kf8 21. Qd8# 1-0`,
 }
 
 reader_init_from_string :: proc(
@@ -78,7 +78,7 @@ reader_init_from_string :: proc(
 }
 
 @(test)
-reading_integers_from_bufio_reader :: proc(^testing.T){
+reading_integers_from_bufio_reader :: proc(_: ^testing.T) {
 	{
 		reader_init_from_string(`1`, &string_reader, &r)
 		thing, s := reader_read_integer(&r)
@@ -89,13 +89,13 @@ reading_integers_from_bufio_reader :: proc(^testing.T){
 		thing, s := reader_read_integer(&r)
 		assert(thing == 37 && s == true, fmt.tprintln(thing, s))
 		dot, err := bufio.reader_read_byte(&r)
-		assert(err==.None)
-		assert(dot=='.')
+		assert(err == .None)
+		assert(dot == '.')
 	}
 }
 
 @(test)
-string_skipping :: proc(^testing.T){
+string_skipping :: proc(_: ^testing.T) {
 	fmt.eprintln("Running the string skipping test")
 	skipped_strings := [?]string{"1/2-1/2", "1-0", "0-1"}
 	{
@@ -130,17 +130,14 @@ string_skipping :: proc(^testing.T){
 		data, err = bufio.reader_peek(&r, 2)
 		assert(err == .None, fmt.tprintln(err))
 		ok_maybe := transmute(string)data
-		assert(
-			ok_maybe == "ok",
-			fmt.tprintln("It doesn't work for the second delimiter:", data),
-		)
+		assert(ok_maybe == "ok", fmt.tprintln("It doesn't work for the second delimiter:", data))
 		fmt.eprintln("Works when you find the second delimiter")
 	}
 	{
 		reader_init_from_string(`1/2-1/21-0ok`, &string_reader, &r)
 		skip_characters_in_set_strings_variant(&r, skipped_strings[:])
 		data, err := bufio.reader_peek(&r, 2)
-		if err!=.None {
+		if err != .None {
 			panic("Got an error")
 		}
 		ok_maybe := transmute(string)data
@@ -151,7 +148,7 @@ string_skipping :: proc(^testing.T){
 }
 
 @(test)
-pgn_half_move_parsing :: proc(^testing.T){
+pgn_half_move_parsing :: proc(_: ^testing.T) {
 	{
 		reader_init_from_string(`e4`, &string_reader, &r)
 		parse_half_move_from_pgn(&r)
@@ -200,8 +197,13 @@ pgn_half_move_parsing :: proc(^testing.T){
 }
 
 @(test)
-parsing_pgn_tokens :: proc(^testing.T){
-	parse_token_from_string_test::proc(reader:^bufio.Reader, string_reader: ^strings.Reader, thing:string, expected_err: PGN_Parsing_Error = .None)->PGN_Parser_Token{
+parsing_pgn_tokens :: proc(_: ^testing.T) {
+	parse_token_from_string_test :: proc(
+		reader: ^bufio.Reader,
+		string_reader: ^strings.Reader,
+		thing: string,
+		expected_err: PGN_Parsing_Error = .None,
+	) -> PGN_Parser_Token {
 		reader_init_from_string(thing, string_reader, reader)
 		// skip_characters_in_set_strings_variant(&r, skipped_strings[:])
 		token, err := parse_pgn_token(reader)
@@ -209,9 +211,9 @@ parsing_pgn_tokens :: proc(^testing.T){
 		fmt.eprintln("Parsing full moves works")
 		return token
 	}
-	_=parse_token_from_string_test(&r, &string_reader, `1.`).(Move_Number)
+	_ = parse_token_from_string_test(&r, &string_reader, `1.`).(Move_Number)
 	fmt.eprintln("TEST parsing .pgn move numbers as tokens successful")
-	_=parse_token_from_string_test(&r, &string_reader, `1-0`).(Chess_Result)
+	_ = parse_token_from_string_test(&r, &string_reader, `1-0`).(Chess_Result)
 	fmt.eprintln("TEST parsing .pgn chess results as tokens successful")
 	parse_token_from_string_test(&r, &string_reader, `e4`)
 	fmt.eprintln("TEST parsing .pgn chess moves as tokens successful")
@@ -222,23 +224,23 @@ parsing_pgn_tokens :: proc(^testing.T){
 		reader_init_from_string(`1. e4 d5 1/2-1/2ok`, &string_reader, &r)
 		token, err := parse_pgn_token(&r)
 		assert(err == .None, fmt.tprintln(token))
-		_=token.(Move_Number)
+		_ = token.(Move_Number)
 		token, err = parse_pgn_token(&r)
 		assert(err == .None, fmt.tprintln(token))
-		_=token.(PGN_Half_Move)
+		_ = token.(PGN_Half_Move)
 		token, err = parse_pgn_token(&r)
 		assert(err == .None, fmt.tprintln(token))
-		_=token.(PGN_Half_Move)
+		_ = token.(PGN_Half_Move)
 		token, err = parse_pgn_token(&r)
 		assert(err == .None, fmt.tprintln(token))
-		_=token.(Chess_Result)
+		_ = token.(Chess_Result)
 		fmt.eprintln("TEST parsing multiple pgn tokens sequentially works")
 	}
 	{
-		pgn_sample:=`[Event "Valencia Casual Games"]`
+		pgn_sample := `[Event "Valencia Casual Games"]`
 		reader_init_from_string(pgn_sample, &string_reader, &r)
-		data, err:=parse_pgn_token(&r)
-		assert(err==.None, fmt.tprintln(data))
+		data, err := parse_pgn_token(&r)
+		assert(err == .None, fmt.tprintln(data))
 		fmt.eprintln("TEST metadata parsing successful")
 	}
 	{
@@ -276,35 +278,41 @@ parsing_pgn_tokens :: proc(^testing.T){
 }
 
 @(test)
-parsing_pgn_games :: proc(^testing.T){
+parsing_pgn_games :: proc(_: ^testing.T) {
 	{
-		reader_init_from_string(`1. e4 d5 2. exd5 Qxd5 3. Nc3 Qd8 4. Bc4 Nf6 5. Nf3 Bg4 6. h3 Bxf3 7. Qxf3 e6 8.
+		reader_init_from_string(
+			`1. e4 d5 2. exd5 Qxd5 3. Nc3 Qd8 4. Bc4 Nf6 5. Nf3 Bg4 6. h3 Bxf3 7. Qxf3 e6 8.
 Qxb7 Nbd7 9. Nb5 Rc8 10. Nxa7 Nb6 11. Nxc8 Nxc8 12. d4 Nd6 13. Bb5+ Nxb5 14.
 Qxb5+ Nd7 15. d5 exd5 16. Be3 Bd6 17. Rd1 Qf6 18. Rxd5 Qg6 19. Bf4 Bxf4 20.
-Qxd7+ Kf8 21. Qd8# 1-0`, &string_reader, &r)
-		game, success:=parse_full_game_from_pgn(&r, true)
-		assert(success==true, fmt.tprintln(game))
+Qxd7+ Kf8 21. Qd8# 1-0`,
+			&string_reader,
+			&r,
+		)
+		game, success := parse_full_game_from_pgn(&r, true)
+		assert(success == true, fmt.tprintln(game))
 		fmt.eprintln("TEST full moves portion parsing successful")
 	}
-	for pgn_sample in sample_pgn_strings{
+	for pgn_sample in sample_pgn_strings {
 		// fmt.eprintln(pgn_sample)
 		reader_init_from_string(pgn_sample, &string_reader, &r)
-		game, success:=parse_full_game_from_pgn(&r)
-		assert(success==true, fmt.tprintln(game))
-		fmt.eprintln(args={"Number of moves:", len(game.moves),"number of metadata entries:", len(game.metadatas)},sep="\t")
-		// for i in game.metadatas{
-		// 	fmt.println(i.key, i.value)
-		// }
-		// for i in game.moves{
-		// 	fmt.println(i.piece_type)
-		// }
+		game, success := parse_full_game_from_pgn(&r)
+		assert(success == true, fmt.tprintln(game))
+		fmt.eprintln(
+			args = {
+				"Number of moves:",
+				len(game.moves),
+				"number of metadata entries:",
+				len(game.metadatas),
+			},
+			sep = "\t",
+		)
 		fmt.eprintln("TEST full pgn game parsing successful")
 	}
 }
 
 @(test)
-getting_potential_moves :: proc(_: ^testing.T){
-	input := Square_Info_Full{{.Pawn, .White}, {3,1}}
+getting_potential_moves :: proc(_: ^testing.T) {
+	input := Square_Info_Full{{.Pawn, .White}, {3, 1}}
 	moves := make([dynamic]Chess_Move_Full, 0, 6, context.temp_allocator)
 	defer delete(moves)
 	get_unrestricted_moves_of_piece(input, &moves)
@@ -313,50 +321,54 @@ getting_potential_moves :: proc(_: ^testing.T){
 
 @(test)
 /* Creates a list of chessboard states after performing each moves from a pgn */
-create_chess_positions :: proc(t: ^testing.T){
+create_chess_positions :: proc(t: ^testing.T) {
 	// FIXME:
 	sample_game_str := sample_pgn_strings[0]
 	reader_init_from_string(sample_game_str, &string_reader, &r)
 	sample_game, success := parse_full_game_from_pgn(&r)
-	assert(len(sample_game.moves)>0)
+	assert(len(sample_game.moves) > 0)
 
 	chessboard_states := make([dynamic]Chessboard_Info, 0)
 	append(&chessboard_states, default_chessboard_info())
 
 	move_buffer := make([dynamic]Chess_Move_Full, 0)
-	for move, index in sample_game.moves{
-		fmt.eprintln("move: ", index, move)
+	for move, index in sample_game.moves {
+		// fmt.eprintln("move: ", index, move)
 		state_before_move := chessboard_states[index]
 
 		state_after_move := state_before_move
 		found_move := false
 		// modify the state
-		traversing_squares: for contents, square_index in state_after_move.square_info{
-			if contents.piece_type == .None{
+		traversing_squares: for contents, square_index in state_after_move.square_info {
+			if contents.piece_type != move.piece_type {
 				continue
 			}
-			if contents.piece_type == move.piece_type{
-				// FIXME: color of the piece matters and is not accounted for yet
-				// FIXME: wrong if there's multiple pieces that can move to the same square
-				square_info := Square_Info_Full{}
-				square_info.piece = contents
-				square_info.x = cast(u8)square_index % 8
-				square_info.y = cast(u8)square_index / 8
-				moves_possible_from_square := get_unrestricted_moves_of_piece(square_info, &move_buffer)
-				for move_possible in moves_possible_from_square{
-					if move_possible.dst == move.dst{
-						state_after_move.square_info[move.dst.x + move.dst.y*8] = contents
-						state_after_move.square_info[square_index] = Square_Info_Full{}
-						append(&chessboard_states, state_after_move)
-						found_move = true
-						break traversing_squares
-					}
+			square_info := Square_Info_Full{}
+			square_info.piece = contents
+			square_info.x = cast(u8)square_index % 8
+			square_info.y = cast(u8)square_index / 8
+			resize(&move_buffer, 0)
+			moves_possible_from_square := get_unrestricted_moves_of_piece(
+				square_info,
+				&move_buffer,
+			)
+			side_to_move := cast(Piece_Color)((index + 1) % 2)
+			if square_info.piece_type != move.piece_type ||
+			   square_info.piece_color != side_to_move {
+				continue
+			}
+			for move_possible in moves_possible_from_square {
+				if move_possible.dst == move.dst {
+					state_after_move.square_info[move.dst.x + move.dst.y * 8] = contents
+					state_after_move.square_info[square_index] = Square_Info_Full{}
+					append(&chessboard_states, state_after_move)
+					found_move = true
+					break traversing_squares
 				}
 			}
 		}
-		if !found_move{
+		if !found_move {
 			panic(fmt.tprintln("Error on move:", index))
 		}
-		resize(&move_buffer, 0)
 	}
 }
