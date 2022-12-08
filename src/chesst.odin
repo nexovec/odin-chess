@@ -110,10 +110,48 @@ Chess_Move_Full :: struct {
 	piece_color: Piece_Color,
 }
 
-get_unrestricted_moves_of_piece :: proc(
-	mv: Square_Info_Full,
-	moves: ^[dynamic]Chess_Move_Full,
-) -> ^[dynamic]Chess_Move_Full {
+@(private="file")
+append_bishop_moves :: proc(mv: Square_Info_Full, move_prefab: Chess_Move_Full, moves: ^[dynamic]Chess_Move_Full){
+	move := move_prefab
+	for i: u8 = 1; mv.x + i < 8 && mv.y + i < 8; i += 1 {
+		move.dst = {mv.x + i, mv.y + i}
+		append(moves, move)
+	}
+	for i: u8 = 1; mv.x - i < 8 && mv.y + i < 8; i += 1 {
+		move.dst = {mv.x - i, mv.y + i}
+		append(moves, move)
+	}
+	for i: u8 = 1; mv.x + i < 8 && mv.y - i < 8; i += 1 {
+		move.dst = {mv.x + i, mv.y - i}
+		append(moves, move)
+	}
+	for i: u8 = 1; mv.x - i < 8 && mv.y - i < 8; i += 1 {
+		move.dst = {mv.x - i, mv.y - i}
+		append(moves, move)
+	}
+}
+@(private="file")
+append_rook_moves :: proc(mv: Square_Info_Full, move_prefab: Chess_Move_Full, moves: ^[dynamic]Chess_Move_Full){
+	move := move_prefab
+	for i: u8 = 0; i < mv.x; i += 1 {
+		move.dst = {i, mv.y}
+		append(moves, move)
+	}
+	for i: u8 = 0; i < mv.y; i += 1 {
+		move.dst = {mv.x, i}
+		append(moves, move)
+	}
+	for i: u8 = mv.x + 1; i < 8; i += 1 {
+		move.dst = {i, mv.y}
+		append(moves, move)
+	}
+	for i: u8 = mv.y + 1; i < 8; i += 1 {
+		move.dst = {mv.x, i}
+		append(moves, move)
+	}
+}
+
+get_unrestricted_moves_of_piece :: proc(mv: Square_Info_Full, moves: ^[dynamic]Chess_Move_Full) -> ^[dynamic]Chess_Move_Full {
 	move := Chess_Move_Full{}
 	move.piece_color = mv.piece_color
 	move.piece_type = mv.piece_type
@@ -147,22 +185,7 @@ get_unrestricted_moves_of_piece :: proc(
 			unimplemented("Pawn promotions are not implemented yet")
 		}
 	case .Rook:
-		for i: u8 = 0; i < mv.x; i += 1 {
-			move.dst = {i, mv.y}
-			append(moves, move)
-		}
-		for i: u8 = 0; i < mv.y; i += 1 {
-			move.dst = {mv.x, i}
-			append(moves, move)
-		}
-		for i: u8 = mv.x + 1; i < 8; i += 1 {
-			move.dst = {i, mv.y}
-			append(moves, move)
-		}
-		for i: u8 = mv.y + 1; i < 8; i += 1 {
-			move.dst = {mv.x, i}
-			append(moves, move)
-		}
+		append_rook_moves(mv, move, moves)
 	case .Knight:
 		c := []Chessboard_location{
 			{mv.x + 1, mv.y + 2},
@@ -181,22 +204,7 @@ get_unrestricted_moves_of_piece :: proc(
 			}
 		}
 	case .Bishop:
-		for i: u8 = 1; mv.x + i < 8 && mv.y + i < 8; i += 1 {
-			move.dst = {mv.x + i, mv.y + i}
-			append(moves, move)
-		}
-		for i: u8 = 1; mv.x - i < 8 && mv.y + i < 8; i += 1 {
-			move.dst = {mv.x - i, mv.y + i}
-			append(moves, move)
-		}
-		for i: u8 = 1; mv.x + i < 8 && mv.y - i < 8; i += 1 {
-			move.dst = {mv.x + i, mv.y - i}
-			append(moves, move)
-		}
-		for i: u8 = 1; mv.x - i < 8 && mv.y - i < 8; i += 1 {
-			move.dst = {mv.x - i, mv.y - i}
-			append(moves, move)
-		}
+		append_bishop_moves(mv, move, moves)
 	case .King:
 		c := []Chessboard_location{
 			{mv.x - 1, mv.y + 1},
@@ -214,43 +222,9 @@ get_unrestricted_moves_of_piece :: proc(
 				append(moves, move)
 			}
 		}
-	// Q: if I destroy a slice, but it was a dynamic array that I took a slice of, does it deallocate properly?
 	case .Queen:
-		// FIXME: this is a copy of rook and bishop moves
-		// mv.piece_type = .Bishop // TODO: this but with .Queen
-		// get_unrestricted_moves_of_piece(mv, moves)
-		for i: u8 = 0; i < mv.x; i += 1 {
-			move.dst = {i, mv.y}
-			append(moves, move)
-		}
-		for i: u8 = 0; i < mv.y; i += 1 {
-			move.dst = {mv.x, i}
-			append(moves, move)
-		}
-		for i: u8 = mv.x + 1; i < 8; i += 1 {
-			move.dst = {i, mv.y}
-			append(moves, move)
-		}
-		for i: u8 = mv.y + 1; i < 8; i += 1 {
-			move.dst = {mv.x, i}
-			append(moves, move)
-		}
-		for i: u8 = 1; mv.x + i < 8 && mv.y + i < 8; i += 1 {
-			move.dst = {mv.x + i, mv.y + i}
-			append(moves, move)
-		}
-		for i: u8 = 1; mv.x - i < 8 && mv.y + i < 8; i += 1 {
-			move.dst = {mv.x - i, mv.y + i}
-			append(moves, move)
-		}
-		for i: u8 = 1; mv.x + i < 8 && mv.y - i < 8; i += 1 {
-			move.dst = {mv.x + i, mv.y - i}
-			append(moves, move)
-		}
-		for i: u8 = 1; mv.x - i < 8 && mv.y - i < 8; i += 1 {
-			move.dst = {mv.x - i, mv.y - i}
-			append(moves, move)
-		}
+		append_bishop_moves(mv, move, moves)
+		append_rook_moves(mv, move, moves)
 	}
 	return moves
 }
