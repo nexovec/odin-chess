@@ -510,6 +510,13 @@ PGN_Parsed_Game :: struct {
 	moves:     [dynamic]PGN_Half_Move,
 	result:    Chess_Result,
 }
+pgn_parsed_game_init :: proc(game: ^PGN_Parsed_Game) {
+	game.metadatas = make([dynamic]PGN_Metadata, 0)
+	assert(game.metadatas.allocator.procedure != nil)
+	game.moves = make([dynamic]PGN_Half_Move, 0)
+	assert(game.moves.allocator.procedure != nil)
+	game.result = Chess_Result.Undecided
+}
 parse_full_game_from_pgn :: proc(
 	reader: ^bufio.Reader,
 	no_metadata: bool = false,
@@ -521,11 +528,6 @@ parse_full_game_from_pgn :: proc(
 	expected := token_types{.PGN_Metadata}
 	if no_metadata {
 		expected = token_types{.Move_Number}
-	}
-	pgn_parsed_game_init :: proc(game: ^PGN_Parsed_Game) {
-		game.metadatas = make([dynamic]PGN_Metadata, 0)
-		game.moves = make([dynamic]PGN_Half_Move, 0)
-		game.result = Chess_Result.Undecided
 	}
 	pgn_parsed_game_destroy :: proc(game: ^PGN_Parsed_Game) {
 		delete_dynamic_array(game.metadatas)

@@ -7,11 +7,28 @@ import SDL_Image "vendor:sdl2/image"
 import SDL_ttf "vendor:sdl2/ttf"
 import os "core:os"
 import io "core:io"
+import mem "core:mem"
 import bufio "core:bufio"
 import win32 "core:sys/windows"
 import strings "core:strings"
 
 Vec2i :: distinct [2]i32
+
+PGN_Game_View :: struct{
+	using game: ^PGN_Parsed_Game,
+	starting_position: Chessboard_Info,
+	current_position: Chessboard_Info,
+	current_move: i32,
+}
+// NOTE(nexovec): expects the starting position to be the default chessboard
+pgn_game_view_init :: proc(view: ^PGN_Game_View, game: ^PGN_Parsed_Game) {
+	assert(game.metadatas.allocator.procedure != nil)
+	assert(game.moves.allocator.procedure != nil)
+	view.game = game
+	view.starting_position = default_chessboard_info()
+	view.current_position = default_chessboard_info()
+	view.current_move = 0
+}
 
 UI_Context :: struct {
 	held_piece:                   Piece_Info,
@@ -24,7 +41,7 @@ default_ui_ctx := UI_Context{{.Pawn, .Black}, 64, 1024, {0, 0}, {}}
 state := struct {
 	mu_ctx:          mu.Context,
 	ui_ctx:          UI_Context,
-	loaded_game:     ^PGN_Parsed_Game,
+	loaded_game:     PGN_Game_View,
 	log_buf:         [1 << 16]byte,
 	log_buf_len:     int,
 	log_buf_updated: bool,
@@ -285,7 +302,7 @@ main :: proc() {
 	if refresh_rate <= 30 {
 		refresh_rate = 30
 	}
-	time_per_tick: i32 = 1000 / refresh_rate
+	time_per_tick: u32 = 1000 / cast(u32)refresh_rate
 	window := SDL.CreateWindow(
 		"microui-odin",
 		SDL.WINDOWPOS_UNDEFINED,
@@ -487,13 +504,22 @@ main :: proc() {
 	defer SDL.DestroyTexture(chessboard_highlights_tex)
 	SDL.SetTextureBlendMode(chessboard_highlights_tex, .BLEND)
 
+	// load an empty default game view
+	{
+		game_view := PGN_Game_View{}
+		game := new(PGN_Parsed_Game)
+		pgn_parsed_game_init(game)
+		pgn_game_view_init(&game_view, game)
+		state.loaded_game = game_view
+	}
+
 	ctx := &state.mu_ctx
 	mu.init(ctx)
 
 	ctx.text_width = mu.default_atlas_text_width
 	ctx.text_height = mu.default_atlas_text_height
 
-	lastTick: i32 = 0
+	last_tick: u32 = 0
 	main_loop: for {
 		for e: SDL.Event; SDL.PollEvent(&e); {
 			#partial switch e.type {
@@ -595,18 +621,16 @@ main :: proc() {
 			}
 
 			// set mask for all plausible moves
-			if state.loaded_game != nil {
-				moves := make([dynamic]Chess_Move_Full, 0, 32)
-				basic_position := default_chessboard_info()
-				coord := state.ui_ctx.hovered_square
-				square := Square_Info_Full{}
-				square.coord = {cast(u8)coord.x, cast(u8)coord.y}
-				square.piece = basic_position.square_info[coord.y * 8 + coord.x]
-				get_unrestricted_moves_of_piece(square, &moves)
-				state.ui_ctx.chessboard_square_mask_green = {}
-				for move in moves {
-					state.ui_ctx.chessboard_square_mask_green[move.dst.y * 8 + move.dst.x] = true
-				}
+			moves := make([dynamic]Chess_Move_Full, 0, 32)
+			// basic_position := default_chessboard_info()
+			coord := state.ui_ctx.hovered_square
+			square := Square_Info_Full{}
+			square.coord = {cast(u8)coord.x, cast(u8)coord.y}
+			square.piece = state.loaded_game.current_position.square_info[coord.y * 8 + coord.x]
+			get_unrestricted_moves_of_piece(square, &moves)
+			state.ui_ctx.chessboard_square_mask_green = {}
+			for move in moves {
+				state.ui_ctx.chessboard_square_mask_green[move.dst.y * 8 + move.dst.x] = true
 			}
 
 			// render green chessboard highlights from mask
@@ -635,10 +659,11 @@ main :: proc() {
 		mu.end(ctx)
 		render(ctx, renderer)
 
-		for i32(SDL.GetTicks()) - lastTick < time_per_tick {
+		for SDL.GetTicks() - last_tick < time_per_tick {
 			SDL.Delay(1)
 		}
-		lastTick = i32(SDL.GetTicks())
+		// last_tick = SDL.GetTicks()
+		last_tick += time_per_tick
 	}
 }
 
@@ -876,6 +901,12 @@ nav_menu_open_file :: proc(
 	return
 }
 
+view_pgn_game :: proc(pgn_game: ^PGN_Parsed_Game){
+	new_game := PGN_Game_View{}
+	pgn_game_view_init(&new_game, pgn_game)
+	state.loaded_game = new_game
+}
+
 Chess_Result :: enum u8 {
 	Undecided,
 	White_Won,
@@ -944,7 +975,8 @@ all_windows :: proc(ctx: ^mu.Context) {
 			if .SUBMIT in mu.button(ctx, "Import") {
 				games := nav_menu_open_file()
 				if len(games) > 0 {
-					state.loaded_game = &games[0]
+					// DEBUG: load all games into a database first
+					view_pgn_game(&games[0])
 				}
 			}
 			mu.button(ctx, "Export")
@@ -1208,7 +1240,7 @@ all_windows :: proc(ctx: ^mu.Context) {
 		if .SUBMIT in mu.button(ctx, "Import") {
 			games := nav_menu_open_file()
 			if len(games) > 0 {
-				state.loaded_game = &games[0]
+				view_pgn_game(&games[0])
 			}
 		}
 	}
