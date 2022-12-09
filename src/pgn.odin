@@ -98,17 +98,17 @@ parse_half_move_from_pgn :: proc(reader: ^bufio.Reader) -> (move: PGN_Half_Move 
 			if move_string[1] != 'x' {
 				return
 			}
-			move.src_x = move_string[0]
+			move.src_x = move_string[0] - 'a'
 			move.known_src_column = true
 			move.dst = Chessboard_location{move_string[2] - 'a', move_string[3] - '1'}
 		case:
 			switch move_string[1] {
 			case 'a' ..= 'h':
 				move.known_src_column = true
-				move.src_y = move_string[1]
+				move.src_x = move_string[1] - 'a'
 			case '1' ..= '8':
 				move.known_src_row = true
-				move.src_x = move_string[1]
+				move.src_y = move_string[2] - '1'
 			case 'x':
 			case:
 				return

@@ -331,8 +331,8 @@ create_chess_positions :: proc(t: ^testing.T) {
 	append(&chessboard_states, default_chessboard_info())
 
 	move_buffer := make([dynamic]Chess_Move_Full, 0)
-	view := PGN_Game_View{}
-	pgn_game_view_init(&view, &sample_game)
+	view := PGN_View{}
+	pgn_view_init(&view, &sample_game)
 	for move, index in sample_game.moves {
 		advanced, success := pgn_view_next_move(&view, &move_buffer)
 		assert(advanced)

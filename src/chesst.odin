@@ -14,14 +14,14 @@ import strings "core:strings"
 
 Vec2i :: distinct [2]i32
 
-PGN_Game_View :: struct{
+PGN_View :: struct{
 	using game: ^PGN_Parsed_Game,
 	starting_position: Chessboard_Info,
 	current_position: Chessboard_Info,
 	current_move: i32,
 }
 // NOTE(nexovec): expects the starting position to be the default chessboard
-pgn_game_view_init :: proc(view: ^PGN_Game_View, game: ^PGN_Parsed_Game) {
+pgn_view_init :: proc(view: ^PGN_View, game: ^PGN_Parsed_Game) {
 	assert(game.metadatas.allocator.procedure != nil)
 	assert(game.moves.allocator.procedure != nil)
 	view.game = game
@@ -29,13 +29,13 @@ pgn_game_view_init :: proc(view: ^PGN_Game_View, game: ^PGN_Parsed_Game) {
 	view.current_position = default_chessboard_info()
 	view.current_move = 0
 }
-pgn_view_next_move :: proc(view: ^PGN_Game_View, move_buffer: ^[dynamic] Chess_Move_Full) -> (advanced: bool, success: bool) {
+pgn_view_next_move :: proc(view: ^PGN_View, move_buffer: ^[dynamic] Chess_Move_Full) -> (advanced: bool, success: bool) {
+	state_before_move := view.current_position
 	state_after_move := view.current_position
 	if cast(int)view.current_move >= len(view.moves) {
 		return false, true
 	}
 	move := view.moves[view.current_move]
-	found_move := false
 	traversing_squares: for contents, square_index in state_after_move.square_info {
 		if contents.piece_type != move.piece_type {
 			continue
@@ -52,15 +52,28 @@ pgn_view_next_move :: proc(view: ^PGN_Game_View, move_buffer: ^[dynamic] Chess_M
 		}
 		for move_possible in moves_possible_from_square {
 			if move_possible.dst == move.dst {
-				state_after_move.square_info[move.dst.x + move.dst.y * 8] = contents
+				dst_index := move.dst.x + move.dst.y * 8
+				if move.known_src_column && move_possible.src.x != move.src_x {
+					fmt.eprintln("uhh", move_possible.src.x, move.src_x)
+					continue
+				}
+				else if move.known_src_row && move_possible.src.y != move.src_y {
+					// fmt.eprintln("uhh")
+					continue
+				}
+				else if move.piece_type == .Pawn && state_after_move.square_info[dst_index].piece_type == .None && move_possible.dst.x != square_info.x{
+					// fmt.eprintln("uhh")
+					continue
+				}
+				state_after_move.square_info[dst_index] = contents
 				state_after_move.square_info[square_index] = Square_Info_Full{}
 				view.current_position = state_after_move
-				found_move = true
-				break traversing_squares
+				state_after_move = state_before_move
+				advanced = true
 			}
 		}
 	}
-	if found_move {
+	if advanced {
 		view.current_move += 1
 		return true, true
 	}
@@ -80,7 +93,7 @@ default_ui_ctx := UI_Context{{.Pawn, .Black}, 64, 1024, {0, 0}, {}}
 state := struct {
 	mu_ctx:          mu.Context,
 	ui_ctx:          UI_Context,
-	loaded_game:     PGN_Game_View,
+	loaded_game:     PGN_View,
 	log_buf:         [1 << 16]byte,
 	log_buf_len:     int,
 	log_buf_updated: bool,
@@ -545,10 +558,10 @@ main :: proc() {
 
 	// load an empty default game view
 	{
-		game_view := PGN_Game_View{}
+		game_view := PGN_View{}
 		game := new(PGN_Parsed_Game)
 		pgn_parsed_game_init(game)
-		pgn_game_view_init(&game_view, game)
+		pgn_view_init(&game_view, game)
 		state.loaded_game = game_view
 	}
 
@@ -941,8 +954,8 @@ nav_menu_open_file :: proc(
 }
 
 view_pgn_game :: proc(pgn_game: ^PGN_Parsed_Game){
-	new_game := PGN_Game_View{}
-	pgn_game_view_init(&new_game, pgn_game)
+	new_game := PGN_View{}
+	pgn_view_init(&new_game, pgn_game)
 	state.loaded_game = new_game
 	write_log("Viewing a game.")
 }
