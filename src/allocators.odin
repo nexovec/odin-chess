@@ -34,7 +34,7 @@ prefab_allocator_proc: runtime.Allocator_Proc: proc(allocator_data: rawptr, mode
 prefab_allocator :: proc(allocator:^Prefab_Allocator) -> runtime.Allocator{
     return runtime.Allocator{
         procedure = prefab_allocator_proc,
-        data = allocator
+        data = allocator,
     }
 }
 
@@ -42,7 +42,7 @@ prefab_allocator :: proc(allocator:^Prefab_Allocator) -> runtime.Allocator{
 Counting_Allocator :: struct{
     backing:^runtime.Allocator,
     count:u64,
-    realloc_count:u64
+    realloc_count:u64,
 }
 
 counting_allocator_proc: runtime.Allocator_Proc: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
@@ -66,17 +66,17 @@ counting_allocator_proc: runtime.Allocator_Proc: proc(allocator_data: rawptr, mo
 counting_allocator :: proc(backing:^runtime.Allocator) -> runtime.Allocator{
     allocator:= Counting_Allocator{
         backing = backing,
-        count = 0
+        count = 0,
     }
     return runtime.Allocator{
         procedure = prefab_allocator_proc,
-        data = &allocator
+        data = &allocator,
     }
 }
 
 Logging_Allocator :: struct{
     backing:^runtime.Allocator,
-    id:string
+    id:string,
 }
 
 logging_allocator_proc: runtime.Allocator_Proc: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
@@ -98,11 +98,11 @@ logging_allocator_proc: runtime.Allocator_Proc: proc(allocator_data: rawptr, mod
 
 logging_allocator :: proc(backing:^runtime.Allocator) -> runtime.Allocator{
     allocator:= Logging_Allocator{
-        backing = backing
+        backing = backing,
     }
     return runtime.Allocator{
         procedure = prefab_allocator_proc,
-        data = &allocator
+        data = &allocator,
     }
 }
 

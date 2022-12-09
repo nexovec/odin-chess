@@ -6,13 +6,7 @@ import io "core:io"
 import reflect "core:reflect"
 
 /* reads a delimited move(without annotations) from the string, doesn't consume the delimiter, result is NULL terminated*/
-consume_delimited_move :: proc(
-	reader: ^bufio.Reader,
-	move_string_backing_buffer: ^[5]byte,
-) -> (
-	[]byte,
-	bool,
-) {
+consume_delimited_move :: proc(reader: ^bufio.Reader, move_string_backing_buffer: ^[5]byte) -> ([]byte, bool) {
 	i := 0
 	for i < 6 {
 		c, err := bufio.reader_read_byte(reader)
@@ -43,12 +37,7 @@ consume_delimited_move :: proc(
 	return move_string_backing_buffer[:0], false
 }
 
-get_piece_type_from_pgn_character :: proc(
-	character: byte,
-) -> (
-	piece_type: Piece_Type,
-	success: bool = true,
-) {
+get_piece_type_from_pgn_character :: proc(character: byte) -> (piece_type: Piece_Type, success: bool = true) {
 	switch character {
 	case 'R':
 		piece_type = .Rook
@@ -67,12 +56,7 @@ get_piece_type_from_pgn_character :: proc(
 	}
 	return
 }
-parse_half_move_from_pgn :: proc(
-	reader: ^bufio.Reader,
-) -> (
-	move: PGN_Half_Move = {},
-	success: bool = false,
-) {
+parse_half_move_from_pgn :: proc(reader: ^bufio.Reader) -> (move: PGN_Half_Move = {}, success: bool = false) {
 	buf: [5]byte = {}
 	move_bytes, consume_success := consume_delimited_move(reader, &buf)
 	// assert(consume_success, transmute(string)move_bytes)
@@ -217,13 +201,7 @@ PGN_Parsing_Error :: enum {
 }
 
 // NOTE: it consumes the thing if it contains the thing. It returns the first match.
-reader_startswith :: proc(
-	reader: ^bufio.Reader,
-	compared_strings: []string,
-) -> (
-	index_of_match: int,
-	success: bool,
-) {
+reader_startswith :: proc(reader: ^bufio.Reader, compared_strings: []string) -> (index_of_match: int, success: bool) {
 
 	// detect results
 	for result_string, index_of_result_string in compared_strings {
@@ -286,12 +264,7 @@ strip_variations :: proc(reader: ^bufio.Reader) -> (did_consume: bool, did_err: 
 	}
 }
 
-parse_pgn_token :: proc(
-	reader: ^bufio.Reader,
-) -> (
-	result: PGN_Parser_Token,
-	e: PGN_Parsing_Error,
-) {
+parse_pgn_token :: proc(reader: ^bufio.Reader) -> (result: PGN_Parser_Token, e: PGN_Parsing_Error) {
 	// skip an optional space, return Empty_Line if there's an empty line
 	{
 		bytes, err := bufio.reader_peek(reader, 1)
@@ -517,10 +490,7 @@ pgn_parsed_game_init :: proc(game: ^PGN_Parsed_Game) {
 	assert(game.moves.allocator.procedure != nil)
 	game.result = Chess_Result.Undecided
 }
-parse_full_game_from_pgn :: proc(
-	reader: ^bufio.Reader,
-	no_metadata: bool = false,
-) -> (
+parse_full_game_from_pgn :: proc(reader: ^bufio.Reader, no_metadata: bool = false) -> (
 	game: PGN_Parsed_Game = {},
 	success: bool,
 ) {

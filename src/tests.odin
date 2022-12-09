@@ -322,7 +322,6 @@ getting_potential_moves :: proc(_: ^testing.T) {
 @(test)
 /* Creates a list of chessboard states after performing each moves from a pgn */
 create_chess_positions :: proc(t: ^testing.T) {
-	// FIXME:
 	sample_game_str := sample_pgn_strings[0]
 	reader_init_from_string(sample_game_str, &string_reader, &r)
 	sample_game, success := parse_full_game_from_pgn(&r)
@@ -332,42 +331,11 @@ create_chess_positions :: proc(t: ^testing.T) {
 	append(&chessboard_states, default_chessboard_info())
 
 	move_buffer := make([dynamic]Chess_Move_Full, 0)
+	view := PGN_Game_View{}
+	pgn_game_view_init(&view, &sample_game)
 	for move, index in sample_game.moves {
-		state_before_move := chessboard_states[index]
-
-		state_after_move := state_before_move
-		found_move := false
-		// modify new state
-		traversing_squares: for contents, square_index in state_after_move.square_info {
-			if contents.piece_type != move.piece_type {
-				continue
-			}
-			square_info := Square_Info_Full{}
-			square_info.piece = contents
-			square_info.x = cast(u8)square_index % 8
-			square_info.y = cast(u8)square_index / 8
-			resize(&move_buffer, 0)
-			moves_possible_from_square := get_unrestricted_moves_of_piece(
-				square_info,
-				&move_buffer,
-			)
-			side_to_move := cast(Piece_Color)((index + 1) % 2)
-			if square_info.piece_type != move.piece_type ||
-			   square_info.piece_color != side_to_move {
-				continue
-			}
-			for move_possible in moves_possible_from_square {
-				if move_possible.dst == move.dst {
-					state_after_move.square_info[move.dst.x + move.dst.y * 8] = contents
-					state_after_move.square_info[square_index] = Square_Info_Full{}
-					append(&chessboard_states, state_after_move)
-					found_move = true
-					break traversing_squares
-				}
-			}
-		}
-		if !found_move {
-			panic(fmt.tprintln("Error on move:", index))
-		}
+		advanced, success := pgn_view_next_move(&view, &move_buffer)
+		assert(advanced)
+		assert(success)
 	}
 }

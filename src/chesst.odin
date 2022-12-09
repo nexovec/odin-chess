@@ -29,6 +29,45 @@ pgn_game_view_init :: proc(view: ^PGN_Game_View, game: ^PGN_Parsed_Game) {
 	view.current_position = default_chessboard_info()
 	view.current_move = 0
 }
+pgn_view_next_move :: proc(view: ^PGN_Game_View, move_buffer: ^[dynamic] Chess_Move_Full) -> (advanced: bool, success: bool) {
+	state_after_move := view.current_position
+	if cast(int)view.current_move >= len(view.moves) {
+		return false, true
+	}
+	move := view.moves[view.current_move]
+	found_move := false
+	traversing_squares: for contents, square_index in state_after_move.square_info {
+		if contents.piece_type != move.piece_type {
+			continue
+		}
+		square_info := Square_Info_Full{}
+		square_info.piece = contents
+		square_info.x = cast(u8)square_index % 8
+		square_info.y = cast(u8)square_index / 8
+		resize(move_buffer, 0)
+		moves_possible_from_square := get_unrestricted_moves_of_piece(square_info, move_buffer)
+		side_to_move := cast(Piece_Color)((view.current_move + 1) % 2)
+		if square_info.piece_type != move.piece_type || square_info.piece_color != side_to_move {
+			continue
+		}
+		for move_possible in moves_possible_from_square {
+			if move_possible.dst == move.dst {
+				state_after_move.square_info[move.dst.x + move.dst.y * 8] = contents
+				state_after_move.square_info[square_index] = Square_Info_Full{}
+				view.current_position = state_after_move
+				found_move = true
+				break traversing_squares
+			}
+		}
+	}
+	if found_move {
+		view.current_move += 1
+		return true, true
+	}
+	else{
+		return false, false
+	}
+}
 
 UI_Context :: struct {
 	held_piece:                   Piece_Info,
@@ -576,7 +615,7 @@ main :: proc() {
 		}
 
 		// redrawing pieces
-		cb := default_chessboard_info()
+		cb := state.loaded_game.current_position
 		SDL.SetTextureBlendMode(pieces_overlay_tex, SDL.BlendMode.BLEND)
 		textures["Pieces"] = pieces_overlay_tex
 		SDL.SetRenderTarget(renderer, pieces_overlay_tex)
@@ -905,6 +944,7 @@ view_pgn_game :: proc(pgn_game: ^PGN_Parsed_Game){
 	new_game := PGN_Game_View{}
 	pgn_game_view_init(&new_game, pgn_game)
 	state.loaded_game = new_game
+	write_log("Viewing a game.")
 }
 
 Chess_Result :: enum u8 {
@@ -1221,6 +1261,13 @@ all_windows :: proc(ctx: ^mu.Context) {
 		}
 		if .SUBMIT in next_mv_btn {
 			mu.text(ctx, "Next move")
+			move_buf := make([dynamic]Chess_Move_Full, 0)
+			defer delete(move_buf)
+			advanced, success := pgn_view_next_move(&state.loaded_game, &move_buf)
+			assert(success)
+			if !advanced{
+				write_log("No more moves")
+			}
 		}
 		if .SUBMIT in last_mv_btn {
 			mu.text(ctx, "Last move")
