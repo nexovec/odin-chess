@@ -1266,14 +1266,34 @@ all_windows :: proc(ctx: ^mu.Context) {
 		prev_mv_btn := mu.button(ctx, "<")
 		next_mv_btn := mu.button(ctx, ">")
 		last_mv_btn := mu.button(ctx, ">>")
-		if .SUBMIT in first_mv_btn {
+		if .ACTIVE in first_mv_btn {
 			mu.text(ctx, "First move")
 		}
-		if .SUBMIT in prev_mv_btn {
+		if .SUBMIT in first_mv_btn {
+			state.loaded_game.current_move = 0
+			state.loaded_game.current_position = state.loaded_game.starting_position
+		}
+		if .ACTIVE in prev_mv_btn {
 			mu.text(ctx, "Previous move")
 		}
-		if .SUBMIT in next_mv_btn {
+		if .SUBMIT in prev_mv_btn{
+			move_num := state.loaded_game.current_move
+			state.loaded_game.current_move = 0
+			state.loaded_game.current_position = state.loaded_game.starting_position
+			move_buf := make([dynamic]Chess_Move_Full, 0)
+			defer delete(move_buf)
+			for i :i32= 0; i < move_num - 1; i+=1 {
+				advanced, success := pgn_view_next_move(&state.loaded_game, &move_buf)
+				assert(success)
+				if !advanced{
+					write_log("No more moves")
+				}
+			}
+		}
+		if .ACTIVE in next_mv_btn {
 			mu.text(ctx, "Next move")
+		}
+		if .SUBMIT in next_mv_btn {
 			move_buf := make([dynamic]Chess_Move_Full, 0)
 			defer delete(move_buf)
 			advanced, success := pgn_view_next_move(&state.loaded_game, &move_buf)
@@ -1282,8 +1302,19 @@ all_windows :: proc(ctx: ^mu.Context) {
 				write_log("No more moves")
 			}
 		}
-		if .SUBMIT in last_mv_btn {
+		if .ACTIVE in last_mv_btn {
 			mu.text(ctx, "Last move")
+		}
+		if .SUBMIT in last_mv_btn{
+			move_buf := make([dynamic]Chess_Move_Full, 0)
+			defer delete(move_buf)
+			for{
+				advanced, success := pgn_view_next_move(&state.loaded_game, &move_buf)
+				assert(success)
+				if !advanced{
+					break
+				}
+			}
 		}
 		mu.layout_row(ctx, {-1}, -5)
 		mu.begin_panel(ctx, "Moves")
