@@ -1029,6 +1029,10 @@ button :: proc(
 	id := len(label) > 0 ? get_id(ctx, label) : get_id(ctx, uintptr(icon))
 	r := layout_next(ctx)
 	update_control(ctx, id, r, opt)
+	/* handle mouse hovering */
+	if ctx.hover_id == id{
+		res += {.ACTIVE}
+	}
 	/* handle click */
 	if ctx.mouse_pressed_bits == {.LEFT} && ctx.focus_id == id {
 		res += {.SUBMIT}
@@ -1049,6 +1053,10 @@ checkbox :: proc(ctx: ^Context, label: string, state: ^bool) -> (res: Result_Set
 	r := layout_next(ctx)
 	box := Rect{r.x, r.y, r.h, r.h}
 	update_control(ctx, id, r, {})
+	/* handle mouse hovering */
+	if ctx.hover_id == id{
+		res += {.ACTIVE}
+	}
 	/* handle click */
 	if .LEFT in ctx.mouse_released_bits && ctx.hover_id == id {
 		res += {.CHANGE}

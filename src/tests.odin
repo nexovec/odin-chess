@@ -315,7 +315,14 @@ getting_potential_moves :: proc(_: ^testing.T) {
 	input := Square_Info_Full{{.Pawn, .White}, {3, 1}}
 	moves := make([dynamic]Chess_Move_Full, 0, 6, context.temp_allocator)
 	defer delete(moves)
-	get_unrestricted_moves_of_piece(input, &moves)
+	// game_moves := make([dynamic]PGN_Half_Move, 0, 6, context.temp_allocator)
+	// game := PGN_Parsed_Game{
+	// 	moves = game_moves,
+	// }
+	// view: PGN_View
+	// pgn_view_init(&view, &game)
+	cb := default_chessboard_info()
+	get_unrestricted_moves_of_piece(input, &moves, &cb)
 	assert(len(moves) == 4, fmt.tprintf("moves:", &moves, len(moves)))
 }
 
