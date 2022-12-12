@@ -233,6 +233,9 @@ get_unrestricted_moves_of_piece :: proc(mv: Square_Info_Full, moves: ^[dynamic]C
 	move.piece_type = mv.piece_type
 	move.src = mv.coord
 	piece_at :: #force_inline proc(x: u8, y: u8, cb: ^Chessboard_Info) -> Piece_Info {
+		if x>7 || y>7 || x<0 || y<0 {
+			return {}
+		}
 		return cb.square_info[x + y * 8]
 	}
 	switch mv.piece_type {

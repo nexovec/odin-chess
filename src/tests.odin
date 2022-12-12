@@ -312,8 +312,8 @@ Qxd7+ Kf8 21. Qd8# 1-0`,
 
 @(test)
 getting_potential_moves :: proc(_: ^testing.T) {
-	input := Square_Info_Full{{.Pawn, .White}, {3, 1}}
-	moves := make([dynamic]Chess_Move_Full, 0, 6, context.temp_allocator)
+	input := Square_Info_Full{{.Pawn, .White}, {1, 1}}
+	moves := make([dynamic]Chess_Move_Full, 0, 6)
 	defer delete(moves)
 	// game_moves := make([dynamic]PGN_Half_Move, 0, 6, context.temp_allocator)
 	// game := PGN_Parsed_Game{
@@ -323,7 +323,7 @@ getting_potential_moves :: proc(_: ^testing.T) {
 	// pgn_view_init(&view, &game)
 	cb := default_chessboard_info()
 	get_unrestricted_moves_of_piece(input, &moves, &cb)
-	assert(len(moves) == 4, fmt.tprintf("moves:", &moves, len(moves)))
+	assert(len(moves) == 2, fmt.tprintf("moves:", &moves, len(moves)))
 }
 
 @(test)
