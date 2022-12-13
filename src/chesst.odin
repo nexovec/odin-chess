@@ -1050,6 +1050,25 @@ PGN_Half_Move :: struct {
 	dst:              Chessboard_location,
 }
 
+reconstruct_pgn_view_description :: proc() -> string{
+	builder := strings.Builder{}
+	strings.builder_init(&builder, 256, 8192)
+	for mv, mv_index in state.loaded_game.moves{
+		if mv_index == cast(int)state.loaded_game.current_move{
+			break
+		}
+		if mv_index % 2 == 0{
+			strings.write_int(&builder, mv_index/2)
+			strings.write_byte(&builder, '.')
+			strings.write_byte(&builder, ' ')
+		}
+		strings.write_string(&builder, "dragons")
+		strings.write_byte(&builder, ' ')
+		// TODO:
+	}
+	return transmute(string)builder.buf[:] // FIXME: leaks
+}
+
 all_windows :: proc(ctx: ^mu.Context) {
 	@(static)
 	opts := mu.Options{.NO_CLOSE}
