@@ -334,15 +334,16 @@ create_chess_positions :: proc(t: ^testing.T) {
 	sample_game, success := parse_full_game_from_pgn(&r)
 	assert(len(sample_game.moves) > 0)
 
-	chessboard_states := make([dynamic]Chessboard_Info, 0)
-	append(&chessboard_states, default_chessboard_info())
+	// chessboard_states := make([dynamic]Chessboard_Info, 0)
+	// append(&chessboard_states, default_chessboard_info())
 
 	move_buffer := make([dynamic]Chess_Move_Full, 0)
 	view := PGN_View{}
 	pgn_view_init(&view, &sample_game)
 	for move, index in sample_game.moves {
-		advanced, success := pgn_view_next_move(&view, &move_buffer)
+		fmt.println(index)
+		advanced, err := pgn_view_next_move(&view, &move_buffer)
 		assert(advanced)
-		assert(success)
+		assert(err == .None)
 	}
 }

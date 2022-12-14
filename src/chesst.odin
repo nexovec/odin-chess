@@ -29,11 +29,16 @@ pgn_view_init :: proc(view: ^PGN_View, game: ^PGN_Parsed_Game) {
 	view.current_position = default_chessboard_info()
 	view.current_move = 0
 }
-pgn_view_next_move :: proc(view: ^PGN_View, move_buffer: ^[dynamic] Chess_Move_Full) -> (advanced: bool, success: bool) {
+PGN_View_Error :: enum u8{
+	None,
+	No_More_Moves,
+	Couldnt_Find_Move,
+}
+pgn_view_next_move :: proc(view: ^PGN_View, move_buffer: ^[dynamic] Chess_Move_Full) -> (advanced: bool, success: PGN_View_Error) {
 	state_before_move := view.current_position
 	state_after_move := view.current_position
-	if cast(int)view.current_move >= len(view.moves) {
-		return false, true
+	if cast(int)view.current_move >= len(view.moves)  || cast(int)view.current_move < 0{
+		return false, .No_More_Moves
 	}
 	move := view.moves[view.current_move]
 	traversing_squares: for contents, square_index in state_after_move.square_info {
@@ -44,7 +49,7 @@ pgn_view_next_move :: proc(view: ^PGN_View, move_buffer: ^[dynamic] Chess_Move_F
 		square_info.piece = contents
 		square_info.x = cast(u8)square_index % 8
 		square_info.y = cast(u8)square_index / 8
-		resize(move_buffer, 0)
+		clear(move_buffer)
 		moves_possible_from_square := get_unrestricted_moves_of_piece(square_info, move_buffer, &state_before_move)
 		side_to_move := cast(Piece_Color)((view.current_move + 1) % 2)
 		if square_info.piece_type != move.piece_type || square_info.piece_color != side_to_move {
@@ -75,10 +80,10 @@ pgn_view_next_move :: proc(view: ^PGN_View, move_buffer: ^[dynamic] Chess_Move_F
 	}
 	if advanced {
 		view.current_move += 1
-		return true, true
+		return true, .None
 	}
 	else{
-		return false, false
+		return false, .Couldnt_Find_Move
 	}
 }
 
@@ -184,45 +189,90 @@ append_bishop_moves :: proc(mv: Square_Info_Full, move_prefab: Chess_Move_Full, 
 	// TODO: return the right value
 	move := move_prefab
 	for i: u8 = 1; mv.x + i < 8 && mv.y + i < 8; i += 1 {
-		square_info := cb.square_info[mv.x + i + (mv.y + i) * 8]
-		if square_info.piece_type == .None || square_info.piece_color != move.piece_color{
-			move.dst = {mv.x + i, mv.y + i}
+		move.dst = {mv.x + i, mv.y + i}
+		square_info := cb.square_info[move.dst.x + (move.dst.y) * 8]
+		if square_info.piece_type == .None || square_info.piece_color != mv.piece_color{
 			append(moves, move)
+		}
+		if square_info.piece_type != .None{
+			break
 		}
 	}
 	for i: u8 = 1; mv.x - i < 8 && mv.y + i < 8; i += 1 {
 		move.dst = {mv.x - i, mv.y + i}
-		append(moves, move)
+		square_info := cb.square_info[move.dst.x + (move.dst.y) * 8]
+		if square_info.piece_type == .None || square_info.piece_color != mv.piece_color{
+			append(moves, move)
+		}
+		if square_info.piece_type != .None{
+			break
+		}
 	}
 	for i: u8 = 1; mv.x + i < 8 && mv.y - i < 8; i += 1 {
 		move.dst = {mv.x + i, mv.y - i}
-		append(moves, move)
+		square_info := cb.square_info[move.dst.x + (move.dst.y) * 8]
+		if square_info.piece_type == .None || square_info.piece_color != mv.piece_color{
+			append(moves, move)
+		}
+		if square_info.piece_type != .None{
+			break
+		}
 	}
 	for i: u8 = 1; mv.x - i < 8 && mv.y - i < 8; i += 1 {
 		move.dst = {mv.x - i, mv.y - i}
-		append(moves, move)
+		square_info := cb.square_info[move.dst.x + (move.dst.y) * 8]
+		if square_info.piece_type == .None || square_info.piece_color != mv.piece_color{
+			append(moves, move)
+		}
+		if square_info.piece_type != .None{
+			break
+		}
 	}
 	return
 }
 @(private="file")
-append_rook_moves :: proc(mv: Square_Info_Full, move_prefab: Chess_Move_Full, moves: ^[dynamic]Chess_Move_Full) -> (can_take: bool){
+append_rook_moves :: proc(mv: Square_Info_Full, move_prefab: Chess_Move_Full, moves: ^[dynamic]Chess_Move_Full, cb: ^Chessboard_Info) -> (can_take: bool){
 	// TODO: return the right value
 	move := move_prefab
-	for i: u8 = 0; i < mv.x; i += 1 {
+	for i: u8 = mv.x - 1; i < 8; i -= 1{
 		move.dst = {i, mv.y}
-		append(moves, move)
+		square_info := cb.square_info[move.dst.x + (move.dst.y) * 8]
+		if square_info.piece_type == .None || square_info.piece_color != mv.piece_color{
+			append(moves, move)
+		}
+		if square_info.piece_type != .None{
+			break
+		}
 	}
-	for i: u8 = 0; i < mv.y; i += 1 {
+	for i: u8 = mv.y - 1; i < 8; i -= 1{
 		move.dst = {mv.x, i}
-		append(moves, move)
+		square_info := cb.square_info[move.dst.x + (move.dst.y) * 8]
+		if square_info.piece_type == .None || square_info.piece_color != mv.piece_color{
+			append(moves, move)
+		}
+		if square_info.piece_type != .None{
+			break
+		}
 	}
 	for i: u8 = mv.x + 1; i < 8; i += 1 {
 		move.dst = {i, mv.y}
-		append(moves, move)
+		square_info := cb.square_info[move.dst.x + (move.dst.y) * 8]
+		if square_info.piece_type == .None || square_info.piece_color != mv.piece_color{
+			append(moves, move)
+		}
+		if square_info.piece_type != .None{
+			break
+		}
 	}
 	for i: u8 = mv.y + 1; i < 8; i += 1 {
 		move.dst = {mv.x, i}
-		append(moves, move)
+		square_info := cb.square_info[move.dst.x + (move.dst.y) * 8]
+		if square_info.piece_type == .None || square_info.piece_color != mv.piece_color{
+			append(moves, move)
+		}
+		if square_info.piece_type != .None{
+			break
+		}
 	}
 	return
 }
@@ -275,7 +325,7 @@ get_unrestricted_moves_of_piece :: proc(mv: Square_Info_Full, moves: ^[dynamic]C
 			unimplemented("Pawn promotions are not implemented yet")
 		}
 	case .Rook:
-		append_rook_moves(mv, move, moves)
+		append_rook_moves(mv, move, moves, cb)
 	case .Knight:
 		c := []Chessboard_location{
 			{mv.x + 1, mv.y + 2},
@@ -313,19 +363,20 @@ get_unrestricted_moves_of_piece :: proc(mv: Square_Info_Full, moves: ^[dynamic]C
 			}
 		}
 		// king side castling
-		// TODO: test
+		// TODO: endangered by knight
+		// FIXME: it's broken(game 1 in Small.pgn)
 		// FIXME: assumes king hasn't lost its castling rights
 		moves_copy := moves^
 		move.dst = {mv.x + 1, mv.y}
 		king_right_placement := (piece_at(4, 0, cb).piece_type == .King && mv.piece_color == .White) || (piece_at(4, 7, cb).piece_type == .King && mv.piece_color == .Black)
 		endangered_by_bishop := append_bishop_moves(mv, move, &moves_copy, cb)
 		moves_copy = moves^
-		endangered_by_rook := append_rook_moves(mv, move, &moves_copy)
+		endangered_by_rook := append_rook_moves(mv, move, &moves_copy, cb)
 		squares_occupied := piece_at(move.dst.x, move.dst.y, cb).piece_type != .None
 		move.dst = {mv.x + 2, mv.y}
 		endangered_by_bishop |= append_bishop_moves(mv, move, &moves_copy, cb)
 		moves_copy = moves^
-		endangered_by_rook |= append_rook_moves(mv, move, &moves_copy)
+		endangered_by_rook |= append_rook_moves(mv, move, &moves_copy, cb)
 		squares_occupied |= piece_at(move.dst.x, move.dst.y, cb).piece_type != .None
 		if king_right_placement && !endangered_by_bishop && !endangered_by_rook && !squares_occupied {
 			move.dst = {mv.x + 2, mv.y}
@@ -336,12 +387,12 @@ get_unrestricted_moves_of_piece :: proc(mv: Square_Info_Full, moves: ^[dynamic]C
 		move.dst = {mv.x - 2, mv.y}
 		endangered_by_bishop = append_bishop_moves(mv, move, &moves_copy, cb)
 		moves_copy = moves^
-		endangered_by_rook = append_rook_moves(mv, move, &moves_copy)
+		endangered_by_rook = append_rook_moves(mv, move, &moves_copy, cb)
 		squares_occupied = piece_at(move.dst.x, move.dst.y, cb).piece_type != .None
 		move.dst = {mv.x - 3, mv.y}
 		endangered_by_bishop |= append_bishop_moves(mv, move, &moves_copy, cb)
 		moves_copy = moves^
-		endangered_by_rook |= append_rook_moves(mv, move, &moves_copy)
+		endangered_by_rook |= append_rook_moves(mv, move, &moves_copy, cb)
 		squares_occupied |= piece_at(move.dst.x, move.dst.y, cb).piece_type != .None
 		if king_right_placement && !endangered_by_bishop && !endangered_by_rook && !squares_occupied {
 			move.dst = {mv.x + 2, mv.y}
@@ -349,7 +400,7 @@ get_unrestricted_moves_of_piece :: proc(mv: Square_Info_Full, moves: ^[dynamic]C
 		}
 	case .Queen:
 		append_bishop_moves(mv, move, moves, cb)
-		append_rook_moves(mv, move, moves)
+		append_rook_moves(mv, move, moves, cb)
 	}
 	return moves
 }
@@ -1359,8 +1410,7 @@ all_windows :: proc(ctx: ^mu.Context) {
 			move_buf := make([dynamic]Chess_Move_Full, 0)
 			defer delete(move_buf)
 			for i :i32= 0; i < move_num - 1; i+=1 {
-				advanced, success := pgn_view_next_move(&state.loaded_game, &move_buf)
-				assert(success)
+				advanced, err := pgn_view_next_move(&state.loaded_game, &move_buf)
 				if !advanced{
 					write_log("No more moves")
 				}
@@ -1372,8 +1422,7 @@ all_windows :: proc(ctx: ^mu.Context) {
 		if .SUBMIT in next_mv_btn {
 			move_buf := make([dynamic]Chess_Move_Full, 0)
 			defer delete(move_buf)
-			advanced, success := pgn_view_next_move(&state.loaded_game, &move_buf)
-			assert(success)
+			advanced, err := pgn_view_next_move(&state.loaded_game, &move_buf)
 			if !advanced{
 				write_log("No more moves")
 			}
@@ -1385,8 +1434,7 @@ all_windows :: proc(ctx: ^mu.Context) {
 			move_buf := make([dynamic]Chess_Move_Full, 0)
 			defer delete(move_buf)
 			for{
-				advanced, success := pgn_view_next_move(&state.loaded_game, &move_buf)
-				assert(success)
+				advanced, err := pgn_view_next_move(&state.loaded_game, &move_buf)
 				if !advanced{
 					break
 				}
