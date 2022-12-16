@@ -308,14 +308,13 @@ get_unrestricted_moves_of_piece :: proc(mv: Square_Info_Full, moves: ^[dynamic]C
 		if piece_left_taking.piece_type == .None {
 			append(moves, move)
 		}
-		move.dst = {mv.x, mv.y + 2}
+		// double move
+		move.dst = {mv.x, mv.y + (-u8(is_b) + u8(is_w))*2}
 		piece_left_taking = piece_at(move.dst.x, move.dst.y, cb)
-		if mv.y == 1 && is_w && piece_left_taking.piece_type == .None{
-			append(moves, move)
-		}
-		move.dst = {mv.x, mv.y - 2}
-		piece_left_taking = piece_at(move.dst.x, move.dst.y, cb)
-		if mv.y == 6 && is_b && piece_left_taking.piece_type == .None{
+		is_white_double_jump := move.dst.y == 3 && is_w
+		is_black_double_jump := move.dst.y == 4 && is_b
+		is_double_jump := is_white_double_jump || is_black_double_jump
+		if piece_left_taking.piece_type == .None && is_double_jump {
 			append(moves, move)
 		}
 		if is_b && mv.y == 1 {
@@ -338,7 +337,10 @@ get_unrestricted_moves_of_piece :: proc(mv: Square_Info_Full, moves: ^[dynamic]C
 			{mv.x - 2, mv.y - 1},
 		}
 		for p in c {
-			if p.x < 8 && p.y < 8 {
+			piece_at_square := piece_at(p.x, p.y, cb)
+			is_empty_square := piece_at_square.piece_type == .None
+			is_same_color := piece_at_square.piece_color != move.piece_color
+			if p.x < 8 && p.y < 8  && (is_empty_square || is_same_color){
 				move.dst = p
 				append(moves, move)
 			}
@@ -357,7 +359,10 @@ get_unrestricted_moves_of_piece :: proc(mv: Square_Info_Full, moves: ^[dynamic]C
 			{mv.x + 1, mv.y - 1},
 		}
 		for p in c {
-			if p.x < 8 && p.y < 8 {
+			piece_at_square := piece_at(p.x, p.y, cb)
+			is_empty_square := piece_at_square.piece_type == .None
+			is_same_color := piece_at_square.piece_color != move.piece_color
+			if p.x < 8 && p.y < 8  && (is_empty_square || is_same_color){
 				move.dst = p
 				append(moves, move)
 			}
@@ -366,33 +371,38 @@ get_unrestricted_moves_of_piece :: proc(mv: Square_Info_Full, moves: ^[dynamic]C
 		// TODO: endangered by knight
 		// FIXME: it's broken(game 1 in Small.pgn)
 		// FIXME: assumes king hasn't lost its castling rights
-		moves_copy := moves^
+		move_len_before_checks := len(moves)
 		move.dst = {mv.x + 1, mv.y}
 		king_right_placement := (piece_at(4, 0, cb).piece_type == .King && mv.piece_color == .White) || (piece_at(4, 7, cb).piece_type == .King && mv.piece_color == .Black)
-		endangered_by_bishop := append_bishop_moves(mv, move, &moves_copy, cb)
-		moves_copy = moves^
-		endangered_by_rook := append_rook_moves(mv, move, &moves_copy, cb)
+		endangered_by_bishop := append_bishop_moves(mv, move, moves, cb)
+		resize(moves, move_len_before_checks)
+		endangered_by_rook := append_rook_moves(mv, move, moves, cb)
+		resize(moves, move_len_before_checks)
 		squares_occupied := piece_at(move.dst.x, move.dst.y, cb).piece_type != .None
 		move.dst = {mv.x + 2, mv.y}
-		endangered_by_bishop |= append_bishop_moves(mv, move, &moves_copy, cb)
-		moves_copy = moves^
-		endangered_by_rook |= append_rook_moves(mv, move, &moves_copy, cb)
+		resize(moves, move_len_before_checks)
+		endangered_by_bishop |= append_bishop_moves(mv, move, moves, cb)
+		resize(moves, move_len_before_checks)
+		endangered_by_rook |= append_rook_moves(mv, move, moves, cb)
+		resize(moves, move_len_before_checks)
 		squares_occupied |= piece_at(move.dst.x, move.dst.y, cb).piece_type != .None
 		if king_right_placement && !endangered_by_bishop && !endangered_by_rook && !squares_occupied {
 			move.dst = {mv.x + 2, mv.y}
 			append(moves, move)
 		}
 		// queen side castling
-		moves_copy = moves^
+		move_len_before_checks = len(moves)
 		move.dst = {mv.x - 2, mv.y}
-		endangered_by_bishop = append_bishop_moves(mv, move, &moves_copy, cb)
-		moves_copy = moves^
-		endangered_by_rook = append_rook_moves(mv, move, &moves_copy, cb)
+		endangered_by_bishop = append_bishop_moves(mv, move, moves, cb)
+		resize(moves, move_len_before_checks)
+		endangered_by_rook = append_rook_moves(mv, move, moves, cb)
+		resize(moves, move_len_before_checks)
 		squares_occupied = piece_at(move.dst.x, move.dst.y, cb).piece_type != .None
 		move.dst = {mv.x - 3, mv.y}
-		endangered_by_bishop |= append_bishop_moves(mv, move, &moves_copy, cb)
-		moves_copy = moves^
-		endangered_by_rook |= append_rook_moves(mv, move, &moves_copy, cb)
+		endangered_by_bishop |= append_bishop_moves(mv, move, moves, cb)
+		resize(moves, move_len_before_checks)
+		endangered_by_rook |= append_rook_moves(mv, move, moves, cb)
+		resize(moves, move_len_before_checks)
 		squares_occupied |= piece_at(move.dst.x, move.dst.y, cb).piece_type != .None
 		if king_right_placement && !endangered_by_bishop && !endangered_by_rook && !squares_occupied {
 			move.dst = {mv.x + 2, mv.y}
