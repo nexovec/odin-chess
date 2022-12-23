@@ -185,6 +185,34 @@ Chess_Move_Full :: struct {
 }
 
 @(private="file")
+append_knight_moves :: proc(mv: Square_Info_Full, move_prefab: Chess_Move_Full, moves: ^[dynamic]Chess_Move_Full, cb: ^Chessboard_Info) -> (can_take: bool){
+	c := []Chessboard_location{
+		{mv.x + 1, mv.y + 2},
+		{mv.x + 1, mv.y - 2},
+		{mv.x - 1, mv.y + 2},
+		{mv.x - 1, mv.y - 2},
+		{mv.x + 2, mv.y + 1},
+		{mv.x + 2, mv.y - 1},
+		{mv.x - 2, mv.y + 1},
+		{mv.x - 2, mv.y - 1},
+	}
+	move := move_prefab
+	for p in c {
+		piece_at_square := piece_at(p.x, p.y, cb)
+		is_empty_square := piece_at_square.piece_type == .None
+		is_same_color := piece_at_square.piece_color != move.piece_color
+		if p.x < 8 && p.y < 8  && (is_empty_square || is_same_color){
+			move.dst = p
+			append(moves, move)
+		}
+		if p.x < 8 && p.y < 8  && !is_empty_square && is_same_color{
+			can_take = true
+		}
+	}
+	return
+}
+
+@(private="file")
 append_bishop_moves :: proc(mv: Square_Info_Full, move_prefab: Chess_Move_Full, moves: ^[dynamic]Chess_Move_Full, cb: ^Chessboard_Info) -> (can_take: bool){
 	// TODO: return the right value
 	move := move_prefab
@@ -277,17 +305,18 @@ append_rook_moves :: proc(mv: Square_Info_Full, move_prefab: Chess_Move_Full, mo
 	return
 }
 
+piece_at :: #force_inline proc(x: u8, y: u8, cb: ^Chessboard_Info) -> Piece_Info {
+	if x>7 || y>7 || x<0 || y<0 {
+		return {}
+	}
+	return cb.square_info[x + y * 8]
+}
+
 get_unrestricted_moves_of_piece :: proc(mv: Square_Info_Full, moves: ^[dynamic]Chess_Move_Full, cb: ^Chessboard_Info) -> ^[dynamic]Chess_Move_Full {
 	move := Chess_Move_Full{}
 	move.piece_color = mv.piece_color
 	move.piece_type = mv.piece_type
 	move.src = mv.coord
-	piece_at :: #force_inline proc(x: u8, y: u8, cb: ^Chessboard_Info) -> Piece_Info {
-		if x>7 || y>7 || x<0 || y<0 {
-			return {}
-		}
-		return cb.square_info[x + y * 8]
-	}
 	switch mv.piece_type {
 	case .None:
 	case .Pawn:
@@ -326,25 +355,7 @@ get_unrestricted_moves_of_piece :: proc(mv: Square_Info_Full, moves: ^[dynamic]C
 	case .Rook:
 		append_rook_moves(mv, move, moves, cb)
 	case .Knight:
-		c := []Chessboard_location{
-			{mv.x + 1, mv.y + 2},
-			{mv.x + 1, mv.y - 2},
-			{mv.x - 1, mv.y + 2},
-			{mv.x - 1, mv.y - 2},
-			{mv.x + 2, mv.y + 1},
-			{mv.x + 2, mv.y - 1},
-			{mv.x - 2, mv.y + 1},
-			{mv.x - 2, mv.y - 1},
-		}
-		for p in c {
-			piece_at_square := piece_at(p.x, p.y, cb)
-			is_empty_square := piece_at_square.piece_type == .None
-			is_same_color := piece_at_square.piece_color != move.piece_color
-			if p.x < 8 && p.y < 8  && (is_empty_square || is_same_color){
-				move.dst = p
-				append(moves, move)
-			}
-		}
+		append_knight_moves(mv, move, moves, cb)
 	case .Bishop:
 		append_bishop_moves(mv, move, moves, cb)
 	case .King:
@@ -358,7 +369,19 @@ get_unrestricted_moves_of_piece :: proc(mv: Square_Info_Full, moves: ^[dynamic]C
 			{mv.x + 1, mv.y},
 			{mv.x + 1, mv.y - 1},
 		}
+		is_square_endangered :: proc(mv: Square_Info_Full, move_prefab: Chess_Move_Full, moves: ^[dynamic]Chess_Move_Full, cb: ^Chessboard_Info) -> bool{
+			move := move_prefab
+			move_len_before_checks := len(moves)
+			endangered_by_bishop := append_bishop_moves(mv, move, moves, cb)
+			resize(moves, move_len_before_checks)
+			endangered_by_rook := append_rook_moves(mv, move, moves, cb)
+			resize(moves, move_len_before_checks)
+			endangered_by_knight := append_knight_moves(mv, move, moves, cb)
+			resize(moves, move_len_before_checks)
+			return endangered_by_bishop || endangered_by_knight || endangered_by_rook
+		}
 		for p in c {
+			// TODO: restrict from moving into checks
 			piece_at_square := piece_at(p.x, p.y, cb)
 			is_empty_square := piece_at_square.piece_type == .None
 			is_same_color := piece_at_square.piece_color != move.piece_color
@@ -367,44 +390,32 @@ get_unrestricted_moves_of_piece :: proc(mv: Square_Info_Full, moves: ^[dynamic]C
 				append(moves, move)
 			}
 		}
-		// king side castling
-		// TODO: endangered by knight
-		// FIXME: it's broken(game 1 in Small.pgn)
+
 		// FIXME: assumes king hasn't lost its castling rights
+		// FIXME: ignores if the rook is there or not
+
+		// king side castling
 		move_len_before_checks := len(moves)
 		move.dst = {mv.x + 1, mv.y}
 		king_right_placement := (piece_at(4, 0, cb).piece_type == .King && mv.piece_color == .White) || (piece_at(4, 7, cb).piece_type == .King && mv.piece_color == .Black)
-		endangered_by_bishop := append_bishop_moves(mv, move, moves, cb)
-		resize(moves, move_len_before_checks)
-		endangered_by_rook := append_rook_moves(mv, move, moves, cb)
-		resize(moves, move_len_before_checks)
+		square_f_endangered := is_square_endangered(mv, move, moves, cb)
 		squares_occupied := piece_at(move.dst.x, move.dst.y, cb).piece_type != .None
 		move.dst = {mv.x + 2, mv.y}
-		resize(moves, move_len_before_checks)
-		endangered_by_bishop |= append_bishop_moves(mv, move, moves, cb)
-		resize(moves, move_len_before_checks)
-		endangered_by_rook |= append_rook_moves(mv, move, moves, cb)
-		resize(moves, move_len_before_checks)
+		square_g_endangered := is_square_endangered(mv, move, moves, cb)
 		squares_occupied |= piece_at(move.dst.x, move.dst.y, cb).piece_type != .None
-		if king_right_placement && !endangered_by_bishop && !endangered_by_rook && !squares_occupied {
+		if king_right_placement && !square_f_endangered && !square_g_endangered && !squares_occupied {
 			move.dst = {mv.x + 2, mv.y}
 			append(moves, move)
 		}
 		// queen side castling
 		move_len_before_checks = len(moves)
 		move.dst = {mv.x - 2, mv.y}
-		endangered_by_bishop = append_bishop_moves(mv, move, moves, cb)
-		resize(moves, move_len_before_checks)
-		endangered_by_rook = append_rook_moves(mv, move, moves, cb)
-		resize(moves, move_len_before_checks)
+		square_c_endangered := is_square_endangered(mv, move, moves, cb)
 		squares_occupied = piece_at(move.dst.x, move.dst.y, cb).piece_type != .None
 		move.dst = {mv.x - 3, mv.y}
-		endangered_by_bishop |= append_bishop_moves(mv, move, moves, cb)
-		resize(moves, move_len_before_checks)
-		endangered_by_rook |= append_rook_moves(mv, move, moves, cb)
-		resize(moves, move_len_before_checks)
+		square_d_endangered := is_square_endangered(mv, move, moves, cb)
 		squares_occupied |= piece_at(move.dst.x, move.dst.y, cb).piece_type != .None
-		if king_right_placement && !endangered_by_bishop && !endangered_by_rook && !squares_occupied {
+		if king_right_placement && !square_d_endangered && !square_c_endangered && !squares_occupied {
 			move.dst = {mv.x + 2, mv.y}
 			append(moves, move)
 		}
