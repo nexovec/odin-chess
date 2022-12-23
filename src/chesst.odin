@@ -392,9 +392,11 @@ get_unrestricted_moves_of_piece :: proc(mv: Square_Info_Full, moves: ^[dynamic]C
 		}
 
 		// FIXME: assumes king hasn't lost its castling rights
-		// FIXME: ignores if the rook is there or not
 
 		// king side castling
+		move.dst = {7, mv.y}
+		piece_at_rook_position := piece_at(move.dst.x, move.dst.y, cb)
+		is_rook_there := piece_at_rook_position.piece_color == mv.piece_color && piece_at_rook_position.piece_type == .Rook
 		move_len_before_checks := len(moves)
 		move.dst = {mv.x + 1, mv.y}
 		king_right_placement := (piece_at(4, 0, cb).piece_type == .King && mv.piece_color == .White) || (piece_at(4, 7, cb).piece_type == .King && mv.piece_color == .Black)
@@ -403,11 +405,14 @@ get_unrestricted_moves_of_piece :: proc(mv: Square_Info_Full, moves: ^[dynamic]C
 		move.dst = {mv.x + 2, mv.y}
 		square_g_endangered := is_square_endangered(mv, move, moves, cb)
 		squares_occupied |= piece_at(move.dst.x, move.dst.y, cb).piece_type != .None
-		if king_right_placement && !square_f_endangered && !square_g_endangered && !squares_occupied {
+		if king_right_placement && !square_f_endangered && !square_g_endangered && !squares_occupied && is_rook_there{
 			move.dst = {mv.x + 2, mv.y}
 			append(moves, move)
 		}
 		// queen side castling
+		move.dst = {7, mv.y}
+		piece_at_rook_position = piece_at(move.dst.x, move.dst.y, cb)
+		is_rook_there = piece_at_rook_position.piece_color == mv.piece_color && piece_at_rook_position.piece_type == .Rook
 		move_len_before_checks = len(moves)
 		move.dst = {mv.x - 2, mv.y}
 		square_c_endangered := is_square_endangered(mv, move, moves, cb)
@@ -415,7 +420,7 @@ get_unrestricted_moves_of_piece :: proc(mv: Square_Info_Full, moves: ^[dynamic]C
 		move.dst = {mv.x - 3, mv.y}
 		square_d_endangered := is_square_endangered(mv, move, moves, cb)
 		squares_occupied |= piece_at(move.dst.x, move.dst.y, cb).piece_type != .None
-		if king_right_placement && !square_d_endangered && !square_c_endangered && !squares_occupied {
+		if king_right_placement && !square_d_endangered && !square_c_endangered && !squares_occupied && is_rook_there{
 			move.dst = {mv.x + 2, mv.y}
 			append(moves, move)
 		}
