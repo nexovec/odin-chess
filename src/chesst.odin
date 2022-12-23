@@ -93,8 +93,9 @@ UI_Context :: struct {
 	chessboard_resolution:        i32,
 	hovered_square:               Vec2i,
 	chessboard_square_mask_green: [64]bool,
+	game_panel_contents:		  string,
 }
-default_ui_ctx := UI_Context{{.Pawn, .Black}, 64, 1024, {0, 0}, {}}
+default_ui_ctx := UI_Context{{.Pawn, .Black}, 64, 1024, {0, 0}, {}, ""}
 state := struct {
 	mu_ctx:          mu.Context,
 	ui_ctx:          UI_Context,
@@ -1487,12 +1488,10 @@ all_windows :: proc(ctx: ^mu.Context) {
 				write_log("No more moves")
 			}
 
-			// NOTE: you will want to free this when you actually use the game view description panel
-			builder:=strings.Builder{}
+			builder := strings.Builder{}
+			delete(state.ui_ctx.game_panel_contents)
 			strings.builder_init(&builder, 0, 8192)
-			// TODO: write to the description window instead
-			description := reconstruct_pgn_view_description(&builder)
-			write_log(description)
+			state.ui_ctx.game_panel_contents = reconstruct_pgn_view_description(&builder)
 		}
 		if .ACTIVE in last_mv_btn {
 			mu.text(ctx, "Last move")
@@ -1512,7 +1511,8 @@ all_windows :: proc(ctx: ^mu.Context) {
 		}
 		mu.layout_row(ctx, {-1}, -5)
 		mu.begin_panel(ctx, "Moves")
-		mu.text(ctx, "Hello")
+		mu.layout_row(ctx, {-1}, -1)
+		mu.text(ctx, state.ui_ctx.game_panel_contents)
 		mu.end_panel(ctx)
 	}
 	if mu.window(ctx, "Open file", {200, 50, 400, 400}) {
