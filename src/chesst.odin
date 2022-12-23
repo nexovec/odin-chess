@@ -1121,29 +1121,63 @@ PGN_Half_Move :: struct {
 	src_y:            u8,
 	is_mate:          bool,
 	is_check:         bool,
-	is_prequalified:  bool,
+	is_takes:		  bool,
+	is_prequalified:  bool, // TODO: remove this
 	is_kside_castles: bool,
 	is_qside_castles: bool,
 	dst:              Chessboard_location,
 }
 
-reconstruct_pgn_view_description :: proc() -> string{
-	builder := strings.Builder{}
-	strings.builder_init(&builder, 256, 8192)
+reconstruct_pgn_view_description :: proc(builder: ^strings.Builder) -> string{
 	for mv, mv_index in state.loaded_game.moves{
 		if mv_index == cast(int)state.loaded_game.current_move{
 			break
 		}
 		if mv_index % 2 == 0{
-			strings.write_int(&builder, mv_index/2)
-			strings.write_byte(&builder, '.')
-			strings.write_byte(&builder, ' ')
+			strings.write_int(builder, mv_index / 2 + 1)
+			strings.write_byte(builder, '.')
+			strings.write_byte(builder, ' ')
 		}
-		strings.write_string(&builder, "dragons")
-		strings.write_byte(&builder, ' ')
-		// TODO:
+		// strings.write_string(builder, "dragons")
+		piece_type_char := ""
+		switch mv.piece_type{
+			case .Rook:
+				piece_type_char = "R"
+			case .Knight:
+				piece_type_char = "N"
+			case .Bishop:
+				piece_type_char = "B"
+			case .King:
+				piece_type_char = "K"
+			case .Queen:
+				piece_type_char = "Q"
+			case .Pawn:
+			case .None:
+				panic("unreachable")
+		}
+		strings.write_string(builder, piece_type_char)
+		if mv.piece_type == .Pawn && mv.is_takes{
+			strings.write_byte(builder, 'a' + mv.src_x)
+		}
+		if mv.is_prequalified{
+			if mv.known_src_column{
+				strings.write_byte(builder, 'a' + mv.src_x)
+			}
+			else if mv.known_src_row{
+				strings.write_byte(builder, '1' + mv.src_y)
+			}
+			else{
+				panic("unreachable")
+			}
+		}
+		if mv.is_takes{
+			strings.write_byte(builder, 'x')
+		}
+		strings.write_byte(builder, 'a' + mv.dst.x)
+		strings.write_byte(builder, '1' + mv.dst.y)
+		strings.write_byte(builder, ' ')
 	}
-	return transmute(string)builder.buf[:] // FIXME: leaks
+	return transmute(string)builder.buf[:]
 }
 
 all_windows :: proc(ctx: ^mu.Context) {
@@ -1452,6 +1486,13 @@ all_windows :: proc(ctx: ^mu.Context) {
 			if !advanced{
 				write_log("No more moves")
 			}
+
+			// NOTE: you will want to free this when you actually use the game view description panel
+			builder:=strings.Builder{}
+			strings.builder_init(&builder, 0, 8192)
+			// TODO: write to the description window instead
+			description := reconstruct_pgn_view_description(&builder)
+			write_log(description)
 		}
 		if .ACTIVE in last_mv_btn {
 			mu.text(ctx, "Last move")
