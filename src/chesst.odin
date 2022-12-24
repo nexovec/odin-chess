@@ -1129,7 +1129,7 @@ PGN_Half_Move :: struct {
 	dst:              Chessboard_location,
 }
 
-reconstruct_pgn_view_description :: proc(builder: ^strings.Builder) -> string{
+construct_pgn_view_description :: proc(builder: ^strings.Builder) -> string{
 	for mv, mv_index in state.loaded_game.moves{
 		if mv_index == cast(int)state.loaded_game.current_move{
 			break
@@ -1454,12 +1454,21 @@ all_windows :: proc(ctx: ^mu.Context) {
 		next_mv_btn := mu.button(ctx, ">")
 		last_mv_btn := mu.button(ctx, ">>")
 		comment_btn := mu.button(ctx, "{}")
+
+		refresh_game_panel_contents :: proc(){
+			builder := strings.Builder{}
+			delete(state.ui_ctx.game_panel_contents)
+			strings.builder_init(&builder, 0, 8192)
+			state.ui_ctx.game_panel_contents = construct_pgn_view_description(&builder)
+		}
+
 		if .ACTIVE in first_mv_btn {
 			mu.text(ctx, "First move")
 		}
 		if .SUBMIT in first_mv_btn {
 			state.loaded_game.current_move = 0
 			state.loaded_game.current_position = state.loaded_game.starting_position
+			refresh_game_panel_contents()
 		}
 		if .ACTIVE in prev_mv_btn {
 			mu.text(ctx, "Previous move")
@@ -1476,6 +1485,7 @@ all_windows :: proc(ctx: ^mu.Context) {
 					write_log("No more moves")
 				}
 			}
+			refresh_game_panel_contents()
 		}
 		if .ACTIVE in next_mv_btn {
 			mu.text(ctx, "Next move")
@@ -1487,11 +1497,7 @@ all_windows :: proc(ctx: ^mu.Context) {
 			if !advanced{
 				write_log("No more moves")
 			}
-
-			builder := strings.Builder{}
-			delete(state.ui_ctx.game_panel_contents)
-			strings.builder_init(&builder, 0, 8192)
-			state.ui_ctx.game_panel_contents = reconstruct_pgn_view_description(&builder)
+			refresh_game_panel_contents()
 		}
 		if .ACTIVE in last_mv_btn {
 			mu.text(ctx, "Last move")
@@ -1505,6 +1511,7 @@ all_windows :: proc(ctx: ^mu.Context) {
 					break
 				}
 			}
+			refresh_game_panel_contents()
 		}
 		if .ACTIVE in comment_btn {
 			mu.text(ctx, "Comment")
@@ -1518,6 +1525,32 @@ all_windows :: proc(ctx: ^mu.Context) {
 	if mu.window(ctx, "Open file", {200, 50, 400, 400}) {
 		mu.layout_row(ctx, {-1}, -28)
 		mu.begin_panel(ctx, "File listings")
+		folder_path := "data"
+		hd, er := os.open(folder_path)
+		if er != os.ERROR_NONE{
+			panic(fmt.tprint("Unexpected error", er, "while opening a folder", folder_path))
+		}
+		files, list_err := os.read_dir(hd, -1)
+		defer os.file_info_slice_delete(files)
+		if list_err != os.ERROR_NONE{
+			panic(fmt.tprint("Couldn't read directory", folder_path))
+		}
+		for file, filename in files{
+			// fmt.println(filename, file)
+			// mu.text(ctx, file.name)
+			mu.layout_row(ctx, {-80, -1}, 18)
+			opts := mu.Options{.NO_FRAME}
+			if file.is_dir{
+				opts = {}
+				mu.layout_row(ctx, {-1}, 18)
+			}
+			if .SUBMIT in mu.button(ctx, file.name, mu.Icon.NONE, opts){
+				fmt.println(file.name)
+			}
+			if !file.is_dir{
+				mu.button(ctx, fmt.tprint(args={file.size/1000, "kb"}, sep = ""), .NONE, {.NO_FRAME})
+			}
+		}
 		mu.end_panel(ctx)
 		mu.layout_row(ctx, {-50, -1})
 		mu.begin_panel(ctx, "File name")
