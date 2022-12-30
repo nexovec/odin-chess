@@ -106,10 +106,12 @@ state := struct {
 	bg:              mu.Color,
 	atlas_texture:   ^SDL.Texture,
 	sdl_wsize:       Vec2i,
+	wd: string,
 } {
 	bg = {90, 95, 100, 255},
 	sdl_wsize = Vec2i{960, 540},
 	ui_ctx = default_ui_ctx,
+	wd = "data",
 }
 
 MU_PROPERTIES := struct {
@@ -881,11 +883,11 @@ render :: proc(ctx: ^mu.Context, renderer: ^SDL.Renderer) {
 		case ^mu.Command_Text:
 			dst := SDL.Rect{cmd.pos.x, cmd.pos.y, 0, 0}
 			for ch in cmd.str do if ch & 0xc0 != 0x80 {
-					r := min(int(ch), 127)
-					src := mu.default_atlas[mu.DEFAULT_ATLAS_FONT + r]
-					render_texture(renderer, &dst, src, cmd.color)
-					dst.x += dst.w
-				}
+				r := min(int(ch), 127)
+				src := mu.default_atlas[mu.DEFAULT_ATLAS_FONT + r]
+				render_texture(renderer, &dst, src, cmd.color)
+				dst.x += dst.w
+			}
 		case ^mu.Command_Rect:
 			SDL.SetRenderDrawColor(renderer, cmd.color.r, cmd.color.g, cmd.color.b, cmd.color.a)
 			SDL.RenderFillRect(renderer, &SDL.Rect{cmd.rect.x, cmd.rect.y, cmd.rect.w, cmd.rect.h})
@@ -1213,6 +1215,9 @@ all_windows :: proc(ctx: ^mu.Context) {
 				mu.end_popup(ctx)
 			}
 			if .SUBMIT in mu.button(ctx, "Import") {
+				cont := mu.get_container(ctx, "Open file")
+				cont.open = true
+				// id := mu.get_id_rawptr()
 				games := nav_menu_open_file()
 				if len(games) > 0 {
 					// DEBUG: load all games into a database first
@@ -1522,18 +1527,23 @@ all_windows :: proc(ctx: ^mu.Context) {
 		mu.text(ctx, state.ui_ctx.game_panel_contents)
 		mu.end_panel(ctx)
 	}
-	if mu.window(ctx, "Open file", {200, 50, 400, 400}) {
+	if mu.window(ctx, "Open file", {200, 50, 400, 400}, {}) {
+		cont := mu.get_current_container(ctx)
+		// panic(fmt.tprintln("Container name:", cont))
+		cont2 := mu.get_container(ctx, "Open file")
+		// assert(cont2.zindex == cont.zindex, fmt.tprintln(cont2.zindex, cont.zindex, cont, cont2))
+		// cont.open = false
 		mu.layout_row(ctx, {-1}, -28)
 		mu.begin_panel(ctx, "File listings")
-		folder_path := "data"
-		hd, er := os.open(folder_path)
+		hd, er := os.open(state.wd)
 		if er != os.ERROR_NONE{
-			panic(fmt.tprint("Unexpected error", er, "while opening a folder", folder_path))
+			panic(fmt.tprint("Unexpected error", er, "while opening a folder", state.wd))
 		}
+		defer os.close(hd)
 		files, list_err := os.read_dir(hd, -1)
 		defer os.file_info_slice_delete(files)
 		if list_err != os.ERROR_NONE{
-			panic(fmt.tprint("Couldn't read directory", folder_path))
+			panic(fmt.tprint("Couldn't read directory", state.wd))
 		}
 		for file, filename in files{
 			// fmt.println(filename, file)
@@ -1545,17 +1555,41 @@ all_windows :: proc(ctx: ^mu.Context) {
 				mu.layout_row(ctx, {-1}, 18)
 			}
 			if .SUBMIT in mu.button(ctx, file.name, mu.Icon.NONE, opts){
-				fmt.println(file.name)
+				if file.is_dir{
+					state.wd = strings.join(a={state.wd, file.name}, sep="/") // I don't care about this leaking
+				}else{
+					games := nav_menu_open_file(strings.join(a={state.wd, file.name}, sep="/")) // I don't care about this leaking
+					if len(games) > 0 {
+						view_pgn_game(&games[0])
+					}
+				}
 			}
 			if !file.is_dir{
 				mu.button(ctx, fmt.tprint(args={file.size/1000, "kb"}, sep = ""), .NONE, {.NO_FRAME})
 			}
 		}
 		mu.end_panel(ctx)
-		mu.layout_row(ctx, {-50, -1})
+		mu.layout_row(ctx, {30, -50, -1})
+		btn := mu.button(ctx, "^")
+		if .ACTIVE in btn{
+			// mu.open_popup(ctx, "parent_directory")
+		}
+		if .SUBMIT in btn{
+			// go to parent directory
+			state.wd = strings.join(a = {state.wd, ".."}, sep = "/")// I don't care about this leaking
+		}
+		if mu.begin_popup(ctx, "parent_directory"){
+			// FIXME: microui popup has the wrong width
+			// FIXME: microui doesn't have the option to make popup not interactable
+			// FIXME: microui doesn't have the option to make popup disappear on loss of hover
+			mu.label(ctx, "parent directory")
+			mu.end_popup(ctx)
+		}
 		mu.begin_panel(ctx, "File name")
 		mu.end_panel(ctx)
 		if .SUBMIT in mu.button(ctx, "Import") {
+			cont := mu.get_container(ctx, "Open file")
+			cont.open = false
 			games := nav_menu_open_file()
 			if len(games) > 0 {
 				view_pgn_game(&games[0])
