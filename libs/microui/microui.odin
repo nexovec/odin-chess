@@ -1541,6 +1541,9 @@ open_popup :: proc(ctx: ^Context, name: string) {
 	bring_to_front(ctx, cnt)
 }
 
+// FIXME: microui popup has the wrong width
+// FIXME: microui doesn't have the option to make popup not interactable
+// FIXME: microui doesn't have the option to make popup disappear on loss of hover
 begin_popup :: proc(ctx: ^Context, name: string) -> bool {
 	opt := Options{.POPUP, .AUTO_SIZE, .NO_RESIZE, .NO_SCROLL, .NO_TITLE, .CLOSED}
 	return begin_window(ctx, name, Rect{}, opt)

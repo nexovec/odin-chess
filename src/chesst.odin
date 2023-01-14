@@ -14,11 +14,11 @@ import strings "core:strings"
 
 Vec2i :: distinct [2]i32
 
-PGN_View :: struct{
-	using game: ^PGN_Parsed_Game,
+PGN_View :: struct {
+	using game:        ^PGN_Parsed_Game,
 	starting_position: Chessboard_Info,
-	current_position: Chessboard_Info,
-	current_move: i32,
+	current_position:  Chessboard_Info,
+	current_move:      i32,
 }
 // NOTE(nexovec): expects the starting position to be the default chessboard
 pgn_view_init :: proc(view: ^PGN_View, game: ^PGN_Parsed_Game) {
@@ -29,15 +29,21 @@ pgn_view_init :: proc(view: ^PGN_View, game: ^PGN_Parsed_Game) {
 	view.current_position = default_chessboard_info()
 	view.current_move = 0
 }
-PGN_View_Error :: enum u8{
+PGN_View_Error :: enum u8 {
 	None,
 	No_More_Moves,
 	Couldnt_Find_Move,
 }
-pgn_view_next_move :: proc(view: ^PGN_View, move_buffer: ^[dynamic] Chess_Move_Full) -> (advanced: bool, success: PGN_View_Error) {
+pgn_view_next_move :: proc(
+	view: ^PGN_View,
+	move_buffer: ^[dynamic]Chess_Move_Full,
+) -> (
+	advanced: bool,
+	success: PGN_View_Error,
+) {
 	state_before_move := view.current_position
 	state_after_move := view.current_position
-	if cast(int)view.current_move >= len(view.moves)  || cast(int)view.current_move < 0{
+	if cast(int)view.current_move >= len(view.moves) || cast(int)view.current_move < 0 {
 		return false, .No_More_Moves
 	}
 	move := view.moves[view.current_move]
@@ -50,7 +56,11 @@ pgn_view_next_move :: proc(view: ^PGN_View, move_buffer: ^[dynamic] Chess_Move_F
 		square_info.x = cast(u8)square_index % 8
 		square_info.y = cast(u8)square_index / 8
 		clear(move_buffer)
-		moves_possible_from_square := get_unrestricted_moves_of_piece(square_info, move_buffer, &state_before_move)
+		moves_possible_from_square := get_unrestricted_moves_of_piece(
+			square_info,
+			move_buffer,
+			&state_before_move,
+		)
 		side_to_move := cast(Piece_Color)((view.current_move + 1) % 2)
 		if square_info.piece_type != move.piece_type || square_info.piece_color != side_to_move {
 			continue
@@ -61,12 +71,12 @@ pgn_view_next_move :: proc(view: ^PGN_View, move_buffer: ^[dynamic] Chess_Move_F
 				if move.known_src_column && move_possible.src.x != move.src_x {
 					fmt.eprintln("uhh", move_possible.src.x, move.src_x)
 					continue
-				}
-				else if move.known_src_row && move_possible.src.y != move.src_y {
+				} else if move.known_src_row && move_possible.src.y != move.src_y {
 					// fmt.eprintln("uhh")
 					continue
-				}
-				else if move.piece_type == .Pawn && state_after_move.square_info[dst_index].piece_type == .None && move_possible.dst.x != square_info.x{
+				} else if move.piece_type == .Pawn &&
+				   state_after_move.square_info[dst_index].piece_type == .None &&
+				   move_possible.dst.x != square_info.x {
 					// fmt.eprintln("uhh")
 					continue
 				}
@@ -81,8 +91,7 @@ pgn_view_next_move :: proc(view: ^PGN_View, move_buffer: ^[dynamic] Chess_Move_F
 	if advanced {
 		view.current_move += 1
 		return true, .None
-	}
-	else{
+	} else {
 		return false, .Couldnt_Find_Move
 	}
 }
@@ -93,23 +102,28 @@ UI_Context :: struct {
 	chessboard_resolution:        i32,
 	hovered_square:               Vec2i,
 	chessboard_square_mask_green: [64]bool,
-	game_panel_contents:		  string,
+	game_panel_contents:          string,
 }
+Metadata_Table :: distinct map[string]^[dynamic]string
 default_ui_ctx := UI_Context{{.Pawn, .Black}, 64, 1024, {0, 0}, {}, ""}
 state := struct {
-	mu_ctx:          mu.Context,
-	ui_ctx:          UI_Context,
-	loaded_game:     PGN_View,
-	log_buf:         [1 << 16]byte,
-	log_buf_len:     int,
-	log_buf_updated: bool,
-	bg:              mu.Color,
-	atlas_texture:   ^SDL.Texture,
-	sdl_wsize:       Vec2i,
-	wd: string,
+	mu_ctx:                    mu.Context,
+	ui_ctx:                    UI_Context,
+	loaded_game:               PGN_View,
+	loaded_db:                 ^[dynamic]PGN_Parsed_Game,
+	log_buf:                   [1 << 16]byte,
+	log_buf_len:               int,
+	log_buf_updated:           bool,
+	bg:                        mu.Color,
+	atlas_texture:             ^SDL.Texture,
+	sdl_wsize:                 Vec2i,
+	wd:                        string,
+	viewed_metadata_dataframe: Metadata_Table,
 } {
 	bg = {90, 95, 100, 255},
 	sdl_wsize = Vec2i{960, 540},
+	loaded_db = nil,
+	viewed_metadata_dataframe = nil,
 	ui_ctx = default_ui_ctx,
 	wd = "data",
 }
@@ -187,8 +201,15 @@ Chess_Move_Full :: struct {
 	piece_color: Piece_Color,
 }
 
-@(private="file")
-append_knight_moves :: proc(mv: Square_Info_Full, move_prefab: Chess_Move_Full, moves: ^[dynamic]Chess_Move_Full, cb: ^Chessboard_Info) -> (can_take: bool){
+@(private = "file")
+append_knight_moves :: proc(
+	mv: Square_Info_Full,
+	move_prefab: Chess_Move_Full,
+	moves: ^[dynamic]Chess_Move_Full,
+	cb: ^Chessboard_Info,
+) -> (
+	can_take: bool,
+) {
 	c := []Chessboard_location{
 		{mv.x + 1, mv.y + 2},
 		{mv.x + 1, mv.y - 2},
@@ -204,104 +225,118 @@ append_knight_moves :: proc(mv: Square_Info_Full, move_prefab: Chess_Move_Full, 
 		piece_at_square := piece_at(p.x, p.y, cb)
 		is_empty_square := piece_at_square.piece_type == .None
 		is_same_color := piece_at_square.piece_color != move.piece_color
-		if p.x < 8 && p.y < 8  && (is_empty_square || is_same_color){
+		if p.x < 8 && p.y < 8 && (is_empty_square || is_same_color) {
 			move.dst = p
 			append(moves, move)
 		}
-		if p.x < 8 && p.y < 8  && !is_empty_square && is_same_color{
+		if p.x < 8 && p.y < 8 && !is_empty_square && is_same_color {
 			can_take = true
 		}
 	}
 	return
 }
 
-@(private="file")
-append_bishop_moves :: proc(mv: Square_Info_Full, move_prefab: Chess_Move_Full, moves: ^[dynamic]Chess_Move_Full, cb: ^Chessboard_Info) -> (can_take: bool){
+@(private = "file")
+append_bishop_moves :: proc(
+	mv: Square_Info_Full,
+	move_prefab: Chess_Move_Full,
+	moves: ^[dynamic]Chess_Move_Full,
+	cb: ^Chessboard_Info,
+) -> (
+	can_take: bool,
+) {
 	// TODO: return the right value
 	move := move_prefab
 	for i: u8 = 1; mv.x + i < 8 && mv.y + i < 8; i += 1 {
 		move.dst = {mv.x + i, mv.y + i}
 		square_info := cb.square_info[move.dst.x + (move.dst.y) * 8]
-		if square_info.piece_type == .None || square_info.piece_color != mv.piece_color{
+		if square_info.piece_type == .None || square_info.piece_color != mv.piece_color {
 			append(moves, move)
 		}
-		if square_info.piece_type != .None{
+		if square_info.piece_type != .None {
 			break
 		}
 	}
 	for i: u8 = 1; mv.x - i < 8 && mv.y + i < 8; i += 1 {
 		move.dst = {mv.x - i, mv.y + i}
 		square_info := cb.square_info[move.dst.x + (move.dst.y) * 8]
-		if square_info.piece_type == .None || square_info.piece_color != mv.piece_color{
+		if square_info.piece_type == .None || square_info.piece_color != mv.piece_color {
 			append(moves, move)
 		}
-		if square_info.piece_type != .None{
+		if square_info.piece_type != .None {
 			break
 		}
 	}
 	for i: u8 = 1; mv.x + i < 8 && mv.y - i < 8; i += 1 {
 		move.dst = {mv.x + i, mv.y - i}
 		square_info := cb.square_info[move.dst.x + (move.dst.y) * 8]
-		if square_info.piece_type == .None || square_info.piece_color != mv.piece_color{
+		if square_info.piece_type == .None || square_info.piece_color != mv.piece_color {
 			append(moves, move)
 		}
-		if square_info.piece_type != .None{
+		if square_info.piece_type != .None {
 			break
 		}
 	}
 	for i: u8 = 1; mv.x - i < 8 && mv.y - i < 8; i += 1 {
 		move.dst = {mv.x - i, mv.y - i}
 		square_info := cb.square_info[move.dst.x + (move.dst.y) * 8]
-		if square_info.piece_type == .None || square_info.piece_color != mv.piece_color{
+		if square_info.piece_type == .None || square_info.piece_color != mv.piece_color {
 			append(moves, move)
 		}
-		if square_info.piece_type != .None{
+		if square_info.piece_type != .None {
 			break
 		}
 	}
 	return
 }
-@(private="file")
-append_rook_moves :: proc(mv: Square_Info_Full, move_prefab: Chess_Move_Full, moves: ^[dynamic]Chess_Move_Full, cb: ^Chessboard_Info) -> (can_take: bool){
+@(private = "file")
+append_rook_moves :: proc(
+	mv: Square_Info_Full,
+	move_prefab: Chess_Move_Full,
+	moves: ^[dynamic]Chess_Move_Full,
+	cb: ^Chessboard_Info,
+) -> (
+	can_take: bool,
+) {
 	// TODO: return the right value
 	move := move_prefab
-	for i: u8 = mv.x - 1; i < 8; i -= 1{
+	for i: u8 = mv.x - 1; i < 8; i -= 1 {
 		move.dst = {i, mv.y}
 		square_info := cb.square_info[move.dst.x + (move.dst.y) * 8]
-		if square_info.piece_type == .None || square_info.piece_color != mv.piece_color{
+		if square_info.piece_type == .None || square_info.piece_color != mv.piece_color {
 			append(moves, move)
 		}
-		if square_info.piece_type != .None{
+		if square_info.piece_type != .None {
 			break
 		}
 	}
-	for i: u8 = mv.y - 1; i < 8; i -= 1{
+	for i: u8 = mv.y - 1; i < 8; i -= 1 {
 		move.dst = {mv.x, i}
 		square_info := cb.square_info[move.dst.x + (move.dst.y) * 8]
-		if square_info.piece_type == .None || square_info.piece_color != mv.piece_color{
+		if square_info.piece_type == .None || square_info.piece_color != mv.piece_color {
 			append(moves, move)
 		}
-		if square_info.piece_type != .None{
+		if square_info.piece_type != .None {
 			break
 		}
 	}
 	for i: u8 = mv.x + 1; i < 8; i += 1 {
 		move.dst = {i, mv.y}
 		square_info := cb.square_info[move.dst.x + (move.dst.y) * 8]
-		if square_info.piece_type == .None || square_info.piece_color != mv.piece_color{
+		if square_info.piece_type == .None || square_info.piece_color != mv.piece_color {
 			append(moves, move)
 		}
-		if square_info.piece_type != .None{
+		if square_info.piece_type != .None {
 			break
 		}
 	}
 	for i: u8 = mv.y + 1; i < 8; i += 1 {
 		move.dst = {mv.x, i}
 		square_info := cb.square_info[move.dst.x + (move.dst.y) * 8]
-		if square_info.piece_type == .None || square_info.piece_color != mv.piece_color{
+		if square_info.piece_type == .None || square_info.piece_color != mv.piece_color {
 			append(moves, move)
 		}
-		if square_info.piece_type != .None{
+		if square_info.piece_type != .None {
 			break
 		}
 	}
@@ -309,13 +344,17 @@ append_rook_moves :: proc(mv: Square_Info_Full, move_prefab: Chess_Move_Full, mo
 }
 
 piece_at :: #force_inline proc(x: u8, y: u8, cb: ^Chessboard_Info) -> Piece_Info {
-	if x>7 || y>7 || x<0 || y<0 {
+	if x > 7 || y > 7 || x < 0 || y < 0 {
 		return {}
 	}
 	return cb.square_info[x + y * 8]
 }
 
-get_unrestricted_moves_of_piece :: proc(mv: Square_Info_Full, moves: ^[dynamic]Chess_Move_Full, cb: ^Chessboard_Info) -> ^[dynamic]Chess_Move_Full {
+get_unrestricted_moves_of_piece :: proc(
+	mv: Square_Info_Full,
+	moves: ^[dynamic]Chess_Move_Full,
+	cb: ^Chessboard_Info,
+) -> ^[dynamic]Chess_Move_Full {
 	move := Chess_Move_Full{}
 	move.piece_color = mv.piece_color
 	move.piece_type = mv.piece_type
@@ -327,12 +366,16 @@ get_unrestricted_moves_of_piece :: proc(mv: Square_Info_Full, moves: ^[dynamic]C
 		is_w := !is_b
 		move.dst = {mv.x - 1, mv.y - u8(is_b) + u8(is_w)}
 		piece_left_taking := piece_at(move.dst.x, move.dst.y, cb)
-		if mv.x > 0 && piece_left_taking.piece_type != .None && piece_left_taking.piece_color != mv.piece_color {
+		if mv.x > 0 &&
+		   piece_left_taking.piece_type != .None &&
+		   piece_left_taking.piece_color != mv.piece_color {
 			append(moves, move)
 		}
 		move.dst = {mv.x + 1, mv.y - u8(is_b) + u8(is_w)}
 		piece_left_taking = piece_at(move.dst.x, move.dst.y, cb)
-		if mv.y < 7  && piece_left_taking.piece_type != .None && piece_left_taking.piece_color != mv.piece_color{
+		if mv.y < 7 &&
+		   piece_left_taking.piece_type != .None &&
+		   piece_left_taking.piece_color != mv.piece_color {
 			append(moves, move)
 		}
 		move.dst = {mv.x, mv.y - u8(is_b) + u8(is_w)}
@@ -341,7 +384,7 @@ get_unrestricted_moves_of_piece :: proc(mv: Square_Info_Full, moves: ^[dynamic]C
 			append(moves, move)
 		}
 		// double move
-		move.dst = {mv.x, mv.y + (-u8(is_b) + u8(is_w))*2}
+		move.dst = {mv.x, mv.y + (-u8(is_b) + u8(is_w)) * 2}
 		piece_left_taking = piece_at(move.dst.x, move.dst.y, cb)
 		is_white_double_jump := move.dst.y == 3 && is_w
 		is_black_double_jump := move.dst.y == 4 && is_b
@@ -372,7 +415,12 @@ get_unrestricted_moves_of_piece :: proc(mv: Square_Info_Full, moves: ^[dynamic]C
 			{mv.x + 1, mv.y},
 			{mv.x + 1, mv.y - 1},
 		}
-		is_square_endangered :: proc(mv: Square_Info_Full, move_prefab: Chess_Move_Full, moves: ^[dynamic]Chess_Move_Full, cb: ^Chessboard_Info) -> bool{
+		is_square_endangered :: proc(
+			mv: Square_Info_Full,
+			move_prefab: Chess_Move_Full,
+			moves: ^[dynamic]Chess_Move_Full,
+			cb: ^Chessboard_Info,
+		) -> bool {
 			move := move_prefab
 			move_len_before_checks := len(moves)
 			endangered_by_bishop := append_bishop_moves(mv, move, moves, cb)
@@ -388,7 +436,7 @@ get_unrestricted_moves_of_piece :: proc(mv: Square_Info_Full, moves: ^[dynamic]C
 			piece_at_square := piece_at(p.x, p.y, cb)
 			is_empty_square := piece_at_square.piece_type == .None
 			is_same_color := piece_at_square.piece_color != move.piece_color
-			if p.x < 8 && p.y < 8  && (is_empty_square || is_same_color){
+			if p.x < 8 && p.y < 8 && (is_empty_square || is_same_color) {
 				move.dst = p
 				append(moves, move)
 			}
@@ -399,23 +447,33 @@ get_unrestricted_moves_of_piece :: proc(mv: Square_Info_Full, moves: ^[dynamic]C
 		// king side castling
 		move.dst = {7, mv.y}
 		piece_at_rook_position := piece_at(move.dst.x, move.dst.y, cb)
-		is_rook_there := piece_at_rook_position.piece_color == mv.piece_color && piece_at_rook_position.piece_type == .Rook
+		is_rook_there :=
+			piece_at_rook_position.piece_color == mv.piece_color &&
+			piece_at_rook_position.piece_type == .Rook
 		move_len_before_checks := len(moves)
 		move.dst = {mv.x + 1, mv.y}
-		king_right_placement := (piece_at(4, 0, cb).piece_type == .King && mv.piece_color == .White) || (piece_at(4, 7, cb).piece_type == .King && mv.piece_color == .Black)
+		king_right_placement :=
+			(piece_at(4, 0, cb).piece_type == .King && mv.piece_color == .White) ||
+			(piece_at(4, 7, cb).piece_type == .King && mv.piece_color == .Black)
 		square_f_endangered := is_square_endangered(mv, move, moves, cb)
 		squares_occupied := piece_at(move.dst.x, move.dst.y, cb).piece_type != .None
 		move.dst = {mv.x + 2, mv.y}
 		square_g_endangered := is_square_endangered(mv, move, moves, cb)
 		squares_occupied |= piece_at(move.dst.x, move.dst.y, cb).piece_type != .None
-		if king_right_placement && !square_f_endangered && !square_g_endangered && !squares_occupied && is_rook_there{
+		if king_right_placement &&
+		   !square_f_endangered &&
+		   !square_g_endangered &&
+		   !squares_occupied &&
+		   is_rook_there {
 			move.dst = {mv.x + 2, mv.y}
 			append(moves, move)
 		}
 		// queen side castling
 		move.dst = {7, mv.y}
 		piece_at_rook_position = piece_at(move.dst.x, move.dst.y, cb)
-		is_rook_there = piece_at_rook_position.piece_color == mv.piece_color && piece_at_rook_position.piece_type == .Rook
+		is_rook_there =
+			piece_at_rook_position.piece_color == mv.piece_color &&
+			piece_at_rook_position.piece_type == .Rook
 		move_len_before_checks = len(moves)
 		move.dst = {mv.x - 2, mv.y}
 		square_c_endangered := is_square_endangered(mv, move, moves, cb)
@@ -423,7 +481,11 @@ get_unrestricted_moves_of_piece :: proc(mv: Square_Info_Full, moves: ^[dynamic]C
 		move.dst = {mv.x - 3, mv.y}
 		square_d_endangered := is_square_endangered(mv, move, moves, cb)
 		squares_occupied |= piece_at(move.dst.x, move.dst.y, cb).piece_type != .None
-		if king_right_placement && !square_d_endangered && !square_c_endangered && !squares_occupied && is_rook_there{
+		if king_right_placement &&
+		   !square_d_endangered &&
+		   !square_c_endangered &&
+		   !squares_occupied &&
+		   is_rook_there {
 			move.dst = {mv.x + 2, mv.y}
 			append(moves, move)
 		}
@@ -479,6 +541,20 @@ default_chessboard_info :: proc() -> Chessboard_Info {
 
 main :: proc() {
 	fmt.eprintln("STARTING PROGRAM!")
+
+	{
+		games := make([dynamic]PGN_Parsed_Game, 0, 64)
+		state.loaded_db = &games
+	}
+	// DEBUG: creating a sample viewed database dataframe
+	{
+		md := make(Metadata_Table)
+		md["White"] = nil
+		md["Black"] = nil
+		md["Result"] = nil
+		state.viewed_metadata_dataframe = md
+	}
+
 	if err := SDL.Init(SDL.INIT_EVERYTHING); err != 0 {
 		fmt.eprintln(err)
 		return
@@ -883,11 +959,11 @@ render :: proc(ctx: ^mu.Context, renderer: ^SDL.Renderer) {
 		case ^mu.Command_Text:
 			dst := SDL.Rect{cmd.pos.x, cmd.pos.y, 0, 0}
 			for ch in cmd.str do if ch & 0xc0 != 0x80 {
-				r := min(int(ch), 127)
-				src := mu.default_atlas[mu.DEFAULT_ATLAS_FONT + r]
-				render_texture(renderer, &dst, src, cmd.color)
-				dst.x += dst.w
-			}
+					r := min(int(ch), 127)
+					src := mu.default_atlas[mu.DEFAULT_ATLAS_FONT + r]
+					render_texture(renderer, &dst, src, cmd.color)
+					dst.x += dst.w
+				}
 		case ^mu.Command_Rect:
 			SDL.SetRenderDrawColor(renderer, cmd.color.r, cmd.color.g, cmd.color.b, cmd.color.a)
 			SDL.RenderFillRect(renderer, &SDL.Rect{cmd.rect.x, cmd.rect.y, cmd.rect.w, cmd.rect.h})
@@ -1024,13 +1100,7 @@ skip_characters_in_set :: proc(
 	return
 }
 
-nav_menu_open_file :: proc(
-	filepath: string = "data/small.pgn",
-) -> (
-	games: ^[dynamic]PGN_Parsed_Game,
-) {
-	games_dynarray := make([dynamic]PGN_Parsed_Game, 0, 32)
-	games = &games_dynarray
+nav_menu_open_file :: proc(games: ^[dynamic]PGN_Parsed_Game, filepath: string = "data/small.pgn") {
 	splits := strings.split(filepath, ".")
 	extension := splits[len(splits) - 1]
 	if extension != "pgn" {
@@ -1076,8 +1146,8 @@ nav_menu_open_file :: proc(
 		if !success {
 			break
 		}
-		thing, _ := bufio.reader_peek(&reader, 15)
-		fmt.eprintln("I have loaded a game, next bytes:", transmute(string)thing)
+		// thing, _ := bufio.reader_peek(&reader, 15)
+		// fmt.eprintln("I have loaded a game, next bytes:", transmute(string)thing)
 		append(games, game)
 		token, token_success := parse_pgn_token(&reader)
 		_, conversion_ok := token.(Empty_Line)
@@ -1089,7 +1159,7 @@ nav_menu_open_file :: proc(
 	return
 }
 
-view_pgn_game :: proc(pgn_game: ^PGN_Parsed_Game){
+view_pgn_game :: proc(pgn_game: ^PGN_Parsed_Game) {
 	new_game := PGN_View{}
 	pgn_view_init(&new_game, pgn_game)
 	state.loaded_game = new_game
@@ -1124,56 +1194,54 @@ PGN_Half_Move :: struct {
 	src_y:            u8,
 	is_mate:          bool,
 	is_check:         bool,
-	is_takes:		  bool,
+	is_takes:         bool,
 	is_prequalified:  bool, // TODO: remove this
 	is_kside_castles: bool,
 	is_qside_castles: bool,
 	dst:              Chessboard_location,
 }
 
-construct_pgn_view_description :: proc(builder: ^strings.Builder) -> string{
-	for mv, mv_index in state.loaded_game.moves{
-		if mv_index == cast(int)state.loaded_game.current_move{
+construct_pgn_view_description :: proc(builder: ^strings.Builder) -> string {
+	for mv, mv_index in state.loaded_game.moves {
+		if mv_index == cast(int)state.loaded_game.current_move {
 			break
 		}
-		if mv_index % 2 == 0{
+		if mv_index % 2 == 0 {
 			strings.write_int(builder, mv_index / 2 + 1)
 			strings.write_byte(builder, '.')
 			strings.write_byte(builder, ' ')
 		}
 		// strings.write_string(builder, "dragons")
 		piece_type_char := ""
-		switch mv.piece_type{
-			case .Rook:
-				piece_type_char = "R"
-			case .Knight:
-				piece_type_char = "N"
-			case .Bishop:
-				piece_type_char = "B"
-			case .King:
-				piece_type_char = "K"
-			case .Queen:
-				piece_type_char = "Q"
-			case .Pawn:
-			case .None:
-				panic("unreachable")
+		switch mv.piece_type {
+		case .Rook:
+			piece_type_char = "R"
+		case .Knight:
+			piece_type_char = "N"
+		case .Bishop:
+			piece_type_char = "B"
+		case .King:
+			piece_type_char = "K"
+		case .Queen:
+			piece_type_char = "Q"
+		case .Pawn:
+		case .None:
+			panic("unreachable")
 		}
 		strings.write_string(builder, piece_type_char)
-		if mv.piece_type == .Pawn && mv.is_takes{
+		if mv.piece_type == .Pawn && mv.is_takes {
 			strings.write_byte(builder, 'a' + mv.src_x)
 		}
-		if mv.is_prequalified{
-			if mv.known_src_column{
+		if mv.is_prequalified {
+			if mv.known_src_column {
 				strings.write_byte(builder, 'a' + mv.src_x)
-			}
-			else if mv.known_src_row{
+			} else if mv.known_src_row {
 				strings.write_byte(builder, '1' + mv.src_y)
-			}
-			else{
+			} else {
 				panic("unreachable")
 			}
 		}
-		if mv.is_takes{
+		if mv.is_takes {
 			strings.write_byte(builder, 'x')
 		}
 		strings.write_byte(builder, 'a' + mv.dst.x)
@@ -1218,10 +1286,11 @@ all_windows :: proc(ctx: ^mu.Context) {
 				cont := mu.get_container(ctx, "Open file")
 				cont.open = true
 				// id := mu.get_id_rawptr()
-				games := nav_menu_open_file()
-				if len(games) > 0 {
+				nav_menu_open_file(state.loaded_db)
+				if len(state.loaded_db) > 0 {
 					// DEBUG: load all games into a database first
-					view_pgn_game(&games[0])
+					view_pgn_game(&state.loaded_db[0])
+					state.loaded_db = state.loaded_db
 				}
 			}
 			mu.button(ctx, "Export")
@@ -1460,7 +1529,7 @@ all_windows :: proc(ctx: ^mu.Context) {
 		last_mv_btn := mu.button(ctx, ">>")
 		comment_btn := mu.button(ctx, "{}")
 
-		refresh_game_panel_contents :: proc(){
+		refresh_game_panel_contents :: proc() {
 			builder := strings.Builder{}
 			delete(state.ui_ctx.game_panel_contents)
 			strings.builder_init(&builder, 0, 8192)
@@ -1478,15 +1547,15 @@ all_windows :: proc(ctx: ^mu.Context) {
 		if .ACTIVE in prev_mv_btn {
 			mu.text(ctx, "Previous move")
 		}
-		if .SUBMIT in prev_mv_btn{
+		if .SUBMIT in prev_mv_btn {
 			move_num := state.loaded_game.current_move
 			state.loaded_game.current_move = 0
 			state.loaded_game.current_position = state.loaded_game.starting_position
 			move_buf := make([dynamic]Chess_Move_Full, 0)
 			defer delete(move_buf)
-			for i :i32= 0; i < move_num - 1; i+=1 {
+			for i: i32 = 0; i < move_num - 1; i += 1 {
 				advanced, err := pgn_view_next_move(&state.loaded_game, &move_buf)
-				if !advanced{
+				if !advanced {
 					write_log("No more moves")
 				}
 			}
@@ -1499,7 +1568,7 @@ all_windows :: proc(ctx: ^mu.Context) {
 			move_buf := make([dynamic]Chess_Move_Full, 0)
 			defer delete(move_buf)
 			advanced, err := pgn_view_next_move(&state.loaded_game, &move_buf)
-			if !advanced{
+			if !advanced {
 				write_log("No more moves")
 			}
 			refresh_game_panel_contents()
@@ -1507,12 +1576,12 @@ all_windows :: proc(ctx: ^mu.Context) {
 		if .ACTIVE in last_mv_btn {
 			mu.text(ctx, "Last move")
 		}
-		if .SUBMIT in last_mv_btn{
+		if .SUBMIT in last_mv_btn {
 			move_buf := make([dynamic]Chess_Move_Full, 0)
 			defer delete(move_buf)
-			for{
+			for {
 				advanced, err := pgn_view_next_move(&state.loaded_game, &move_buf)
-				if !advanced{
+				if !advanced {
 					break
 				}
 			}
@@ -1535,65 +1604,98 @@ all_windows :: proc(ctx: ^mu.Context) {
 		// cont.open = false
 		mu.layout_row(ctx, {-1}, -28)
 		mu.begin_panel(ctx, "File listings")
-		hd, er := os.open(state.wd)
-		if er != os.ERROR_NONE{
+		hd, er := os.open(state.wd) // FIXME: come on... not every tick!
+		if er != os.ERROR_NONE {
 			panic(fmt.tprint("Unexpected error", er, "while opening a folder", state.wd))
 		}
 		defer os.close(hd)
 		files, list_err := os.read_dir(hd, -1)
 		defer os.file_info_slice_delete(files)
-		if list_err != os.ERROR_NONE{
+		if list_err != os.ERROR_NONE {
 			panic(fmt.tprint("Couldn't read directory", state.wd))
 		}
-		for file, filename in files{
+		for file, filename in files {
 			// fmt.println(filename, file)
 			// mu.text(ctx, file.name)
 			mu.layout_row(ctx, {-80, -1}, 18)
 			opts := mu.Options{.NO_FRAME}
-			if file.is_dir{
+			if file.is_dir {
 				opts = {}
 				mu.layout_row(ctx, {-1}, 18)
 			}
-			if .SUBMIT in mu.button(ctx, file.name, mu.Icon.NONE, opts){
-				if file.is_dir{
-					state.wd = strings.join(a={state.wd, file.name}, sep="/") // I don't care about this leaking
-				}else{
-					games := nav_menu_open_file(strings.join(a={state.wd, file.name}, sep="/")) // I don't care about this leaking
-					if len(games) > 0 {
-						view_pgn_game(&games[0])
+			if .SUBMIT in mu.button(ctx, file.name, mu.Icon.NONE, opts) {
+				if file.is_dir {
+					state.wd = strings.join(a = {state.wd, file.name}, sep = "/") // I don't care about this leaking
+				} else {
+					nav_menu_open_file(
+						state.loaded_db,
+						strings.join(a = {state.wd, file.name}, sep = "/"),
+					) // I don't care about this leaking
+					// cont := mu.get_container(ctx, "Open file")
+					// cont.open = false
+					if len(state.loaded_db) > 0 {
+						view_pgn_game(&state.loaded_db[0])
+						state.loaded_db = state.loaded_db
 					}
 				}
 			}
-			if !file.is_dir{
-				mu.button(ctx, fmt.tprint(args={file.size/1000, "kb"}, sep = ""), .NONE, {.NO_FRAME})
+			if !file.is_dir {
+				mu.button(
+					ctx,
+					fmt.tprint(args = {file.size / 1000, "kb"}, sep = ""),
+					.NONE,
+					{.NO_FRAME},
+				)
 			}
 		}
 		mu.end_panel(ctx)
 		mu.layout_row(ctx, {30, -50, -1})
 		btn := mu.button(ctx, "^")
-		if .ACTIVE in btn{
+		if .ACTIVE in btn {
 			// mu.open_popup(ctx, "parent_directory")
 		}
-		if .SUBMIT in btn{
+		if .SUBMIT in btn {
 			// go to parent directory
-			state.wd = strings.join(a = {state.wd, ".."}, sep = "/")// I don't care about this leaking
+			state.wd = strings.join(a = {state.wd, ".."}, sep = "/") // I don't care about this leaking
 		}
-		if mu.begin_popup(ctx, "parent_directory"){
-			// FIXME: microui popup has the wrong width
-			// FIXME: microui doesn't have the option to make popup not interactable
-			// FIXME: microui doesn't have the option to make popup disappear on loss of hover
+		if mu.begin_popup(ctx, "parent_directory") {
 			mu.label(ctx, "parent directory")
 			mu.end_popup(ctx)
 		}
 		mu.begin_panel(ctx, "File name")
 		mu.end_panel(ctx)
 		if .SUBMIT in mu.button(ctx, "Import") {
-			cont := mu.get_container(ctx, "Open file")
-			cont.open = false
-			games := nav_menu_open_file()
-			if len(games) > 0 {
-				view_pgn_game(&games[0])
+			// cont := mu.get_container(ctx, "Open file")
+			// cont.open = false
+			nav_menu_open_file(state.loaded_db)
+			if len(state.loaded_db) > 0 {
+				view_pgn_game(&state.loaded_db[0])
+				state.loaded_db = state.loaded_db
 			}
 		}
+	}
+	if mu.window(ctx, "Games explorer", {100, 40, 400, 400}) {
+		mu.layout_row(ctx, {-1}, -1)
+		mu.begin_panel(ctx, "Database listing")
+		mu.layout_row(ctx, {100, 100, 100})
+		assert(state.viewed_metadata_dataframe != nil)
+		for metadata_column, entries in state.viewed_metadata_dataframe {
+			mu.button(ctx, metadata_column)
+		}
+		opts = mu.Options{.NO_FRAME}
+
+		if state.loaded_db != nil {
+			for game, key in state.loaded_db {
+				for md in game.metadatas {
+					_, ok := state.viewed_metadata_dataframe[md.key]
+					if ok {
+						mu.button(ctx, md.value, .NONE, opts)
+					}
+				}
+			}
+		} else {
+			fmt.eprintln("no game")
+		}
+		mu.end_panel(ctx)
 	}
 }
