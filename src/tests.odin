@@ -288,7 +288,7 @@ Qxd7+ Kf8 21. Qd8# 1-0`,
 			&string_reader,
 			&r,
 		)
-		game, success := parse_full_game_from_pgn(&r, true)
+		game, success := parse_full_game_from_pgn(&r)
 		assert(success == true, fmt.tprintln(game))
 		fmt.eprintln("TEST full moves portion parsing successful")
 	}
@@ -302,7 +302,7 @@ Qxd7+ Kf8 21. Qd8# 1-0`,
 				"Number of moves:",
 				len(game.moves),
 				"number of metadata entries:",
-				len(game.metadatas),
+				// len(game.metadatas),
 			},
 			sep = "\t",
 		)

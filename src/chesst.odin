@@ -11,6 +11,7 @@ import mem "core:mem"
 import bufio "core:bufio"
 import win32 "core:sys/windows"
 import strings "core:strings"
+import slice "core:slice"
 
 Vec2i :: distinct [2]i32
 
@@ -22,7 +23,7 @@ PGN_View :: struct {
 }
 // NOTE(nexovec): expects the starting position to be the default chessboard
 pgn_view_init :: proc(view: ^PGN_View, game: ^PGN_Parsed_Game) {
-	assert(game.metadatas.allocator.procedure != nil)
+	// assert(game.metadatas.allocator.procedure != nil)
 	assert(game.moves.allocator.procedure != nil)
 	view.game = game
 	view.starting_position = default_chessboard_info()
@@ -104,7 +105,7 @@ UI_Context :: struct {
 	chessboard_square_mask_green: [64]bool,
 	game_panel_contents:          string,
 }
-Metadata_Table :: distinct map[string]^[dynamic]string
+Metadata_Table :: distinct map[string][dynamic]string
 default_ui_ctx := UI_Context{{.Pawn, .Black}, 64, 1024, {0, 0}, {}, ""}
 state := struct {
 	mu_ctx:                    mu.Context,
@@ -1142,7 +1143,7 @@ nav_menu_open_file :: proc(games: ^[dynamic]PGN_Parsed_Game, filepath: string = 
 		}
 	}
 	reader_loop: for {
-		game, success := parse_full_game_from_pgn(&reader)
+		game, success := parse_full_game_from_pgn(&reader, &state.viewed_metadata_dataframe)
 		if !success {
 			break
 		}
@@ -1665,8 +1666,6 @@ all_windows :: proc(ctx: ^mu.Context) {
 		mu.begin_panel(ctx, "File name")
 		mu.end_panel(ctx)
 		if .SUBMIT in mu.button(ctx, "Import") {
-			// cont := mu.get_container(ctx, "Open file")
-			// cont.open = false
 			nav_menu_open_file(state.loaded_db)
 			if len(state.loaded_db) > 0 {
 				view_pgn_game(&state.loaded_db[0])
@@ -1677,21 +1676,21 @@ all_windows :: proc(ctx: ^mu.Context) {
 	if mu.window(ctx, "Games explorer", {100, 40, 400, 400}) {
 		mu.layout_row(ctx, {-1}, -1)
 		mu.begin_panel(ctx, "Database listing")
-		mu.layout_row(ctx, {100, 100, 100})
+		mu.layout_row(ctx, {100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100})
 		assert(state.viewed_metadata_dataframe != nil)
-		for metadata_column, entries in state.viewed_metadata_dataframe {
-			mu.button(ctx, metadata_column)
-		}
 		opts = mu.Options{.NO_FRAME}
 
 		if state.loaded_db != nil {
-			for game, key in state.loaded_db {
-				for md in game.metadatas {
-					_, ok := state.viewed_metadata_dataframe[md.key]
-					if ok {
-						mu.button(ctx, md.value, .NONE, opts)
-					}
+			arr := make([]i32, len(state.viewed_metadata_dataframe))
+			slice.fill(arr, 100)
+
+			for key, column in state.viewed_metadata_dataframe{
+				mu.layout_begin_column(ctx)
+				mu.button(ctx, key)
+				for text in column{
+					mu.button(ctx, text, .NONE, opts)
 				}
+				mu.layout_end_column(ctx)
 			}
 		} else {
 			fmt.eprintln("no game")
