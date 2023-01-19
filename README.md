@@ -6,7 +6,7 @@ A minimalist chess gui for managing databases with emphasis on performance.
 
 - [x] database view (partially done)
   - [ ] sorting columns
-  - [ ] metadata filtering
+  - [x] metadata filtering
 - [ ] fullscreen mode
 - [ ] importing positions
   - [x] pgn (partially done)

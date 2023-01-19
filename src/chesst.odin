@@ -23,6 +23,10 @@ PGN_View :: struct {
 	current_position:  Chessboard_Info,
 	current_move:      i32,
 }
+PGN_DB_View :: struct{
+	name: string,
+	games: ^[dynamic]PGN_Parsed_Game,
+}
 // NOTE(nexovec): expects the starting position to be the default chessboard
 pgn_view_init :: proc(view: ^PGN_View, game: ^PGN_Parsed_Game) {
 	// assert(game.metadatas.allocator.procedure != nil)
@@ -113,7 +117,7 @@ state := struct {
 	mu_ctx:                    mu.Context,
 	ui_ctx:                    UI_Context,
 	loaded_game:               PGN_View,
-	loaded_db:                 ^[dynamic]PGN_Parsed_Game,
+	loaded_db:                 PGN_DB_View,
 	db_filtering:			   map[string]bool,
 	log_buf:                   [1 << 16]byte,
 	log_buf_len:               int,
@@ -126,7 +130,7 @@ state := struct {
 } {
 	bg = {90, 95, 100, 255},
 	sdl_wsize = Vec2i{960, 540},
-	loaded_db = nil,
+	loaded_db = {"", nil},
 	viewed_metadata_dataframe = nil,
 	ui_ctx = default_ui_ctx,
 	wd = "data",
@@ -548,7 +552,7 @@ main :: proc() {
 
 	{
 		games := make([dynamic]PGN_Parsed_Game, 0, 64)
-		state.loaded_db = &games
+		state.loaded_db.games = &games
 	}
 	// DEBUG: creating a sample viewed database dataframe
 	{
@@ -1108,7 +1112,7 @@ skip_characters_in_set :: proc(
 	return
 }
 
-nav_menu_open_file :: proc(games: ^[dynamic]PGN_Parsed_Game, filepath: string = "data/small.pgn") {
+nav_menu_open_file :: proc(games: ^[dynamic]PGN_Parsed_Game, filepath: string) {
 	splits := strings.split(filepath, ".")
 	extension := splits[len(splits) - 1]
 	if extension != "pgn" {
@@ -1259,6 +1263,15 @@ construct_pgn_view_description :: proc(builder: ^strings.Builder) -> string {
 	return transmute(string)builder.buf[:]
 }
 
+open_and_view_pgn_db :: proc(filepath := "data/small.pgn"){
+	nav_menu_open_file(state.loaded_db.games, filepath)
+	state.loaded_db.name = filepath
+	if len(state.loaded_db.games) > 0 {
+		view_pgn_game(&state.loaded_db.games[0])
+		state.loaded_db = state.loaded_db
+	}
+}
+
 all_windows :: proc(ctx: ^mu.Context) {
 	@(static)
 	opts := mu.Options{.NO_CLOSE}
@@ -1293,13 +1306,7 @@ all_windows :: proc(ctx: ^mu.Context) {
 			if .SUBMIT in mu.button(ctx, "Import") {
 				cont := mu.get_container(ctx, "Open file")
 				cont.open = true
-				// id := mu.get_id_rawptr()
-				nav_menu_open_file(state.loaded_db)
-				if len(state.loaded_db) > 0 {
-					// DEBUG: load all games into a database first
-					view_pgn_game(&state.loaded_db[0])
-					state.loaded_db = state.loaded_db
-				}
+				open_and_view_pgn_db()
 			}
 			mu.button(ctx, "Export")
 			mu.button(ctx, "Chesst files")
@@ -1632,19 +1639,11 @@ all_windows :: proc(ctx: ^mu.Context) {
 				mu.layout_row(ctx, {-1}, 18)
 			}
 			if .SUBMIT in mu.button(ctx, file.name, mu.Icon.NONE, opts) {
+				name := strings.join(a = {state.wd, file.name}, sep = "/")// I don't care about this leaking
 				if file.is_dir {
-					state.wd = strings.join(a = {state.wd, file.name}, sep = "/") // I don't care about this leaking
+					state.wd = name
 				} else {
-					nav_menu_open_file(
-						state.loaded_db,
-						strings.join(a = {state.wd, file.name}, sep = "/"),
-					) // I don't care about this leaking
-					// cont := mu.get_container(ctx, "Open file")
-					// cont.open = false
-					if len(state.loaded_db) > 0 {
-						view_pgn_game(&state.loaded_db[0])
-						state.loaded_db = state.loaded_db
-					}
+					open_and_view_pgn_db(name)
 				}
 			}
 			if !file.is_dir {
@@ -1673,21 +1672,21 @@ all_windows :: proc(ctx: ^mu.Context) {
 		mu.begin_panel(ctx, "File name")
 		mu.end_panel(ctx)
 		if .SUBMIT in mu.button(ctx, "Import") {
-			nav_menu_open_file(state.loaded_db)
-			if len(state.loaded_db) > 0 {
-				view_pgn_game(&state.loaded_db[0])
-				state.loaded_db = state.loaded_db
-			}
+			open_and_view_pgn_db()
 		}
 	}
 	if mu.window(ctx, "Games explorer", {100, 40, 800, 450}) {
 		mu.layout_row(ctx, {-300, -1}, -1)
+		mu.layout_begin_column(ctx)
+		mu.layout_row(ctx, {100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100})
+		mu.button(ctx, state.loaded_db.name)
+		mu.layout_row(ctx, {-1}, -1)
 		mu.begin_panel(ctx, "Database listing")
 		mu.layout_row(ctx, {100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100})
 		assert(state.viewed_metadata_dataframe != nil)
 		opts = mu.Options{.NO_FRAME}
 
-		if state.loaded_db != nil {
+		if state.loaded_db.games != nil {
 			arr := make([]i32, len(state.viewed_metadata_dataframe))
 			slice.fill(arr, 100)
 
@@ -1707,6 +1706,8 @@ all_windows :: proc(ctx: ^mu.Context) {
 			fmt.eprintln("no game")
 		}
 		mu.end_panel(ctx)
+		mu.layout_end_column(ctx)
+
 		mu.layout_begin_column(ctx)
 		mu.layout_row(ctx, {-1}, 10)
 		mu.text(ctx, "Database filtering")
