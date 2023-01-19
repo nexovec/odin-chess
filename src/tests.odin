@@ -292,10 +292,11 @@ Qxd7+ Kf8 21. Qd8# 1-0`,
 		assert(success == true, fmt.tprintln(game))
 		fmt.eprintln("TEST full moves portion parsing successful")
 	}
+	md := make(Metadata_Table)
 	for pgn_sample in sample_pgn_strings {
 		// fmt.eprintln(pgn_sample)
 		reader_init_from_string(pgn_sample, &string_reader, &r)
-		game, success := parse_full_game_from_pgn(&r)
+		game, success := parse_full_game_from_pgn(&r, &md)
 		assert(success == true, fmt.tprintln(game))
 		fmt.eprintln(
 			args = {
@@ -331,7 +332,8 @@ getting_potential_moves :: proc(_: ^testing.T) {
 create_chess_positions :: proc(t: ^testing.T) {
 	sample_game_str := sample_pgn_strings[0]
 	reader_init_from_string(sample_game_str, &string_reader, &r)
-	sample_game, success := parse_full_game_from_pgn(&r)
+	md := make(Metadata_Table)
+	sample_game, success := parse_full_game_from_pgn(&r, &md)
 	assert(len(sample_game.moves) > 0)
 
 	// chessboard_states := make([dynamic]Chessboard_Info, 0)

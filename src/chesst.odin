@@ -13,6 +13,8 @@ import win32 "core:sys/windows"
 import strings "core:strings"
 import slice "core:slice"
 
+MAX_VISIBLE_COLUMNS := 16
+
 Vec2i :: distinct [2]i32
 
 PGN_View :: struct {
@@ -112,6 +114,7 @@ state := struct {
 	ui_ctx:                    UI_Context,
 	loaded_game:               PGN_View,
 	loaded_db:                 ^[dynamic]PGN_Parsed_Game,
+	db_filtering:			   map[string]bool,
 	log_buf:                   [1 << 16]byte,
 	log_buf_len:               int,
 	log_buf_updated:           bool,
@@ -554,6 +557,10 @@ main :: proc() {
 		md["Black"] = nil
 		md["Result"] = nil
 		state.viewed_metadata_dataframe = md
+		state.db_filtering = make(map[string]bool)
+		state.db_filtering["White"] = true
+		state.db_filtering["Black"] = true
+		state.db_filtering["Result"] = true
 	}
 
 	if err := SDL.Init(SDL.INIT_EVERYTHING); err != 0 {
@@ -569,7 +576,7 @@ main :: proc() {
 	}
 	time_per_tick: u32 = 1000 / cast(u32)refresh_rate
 	window := SDL.CreateWindow(
-		"microui-odin",
+		"Chesst.exe - chess database explorer",
 		SDL.WINDOWPOS_UNDEFINED,
 		SDL.WINDOWPOS_UNDEFINED,
 		state.sdl_wsize.x,
@@ -1673,8 +1680,8 @@ all_windows :: proc(ctx: ^mu.Context) {
 			}
 		}
 	}
-	if mu.window(ctx, "Games explorer", {100, 40, 400, 400}) {
-		mu.layout_row(ctx, {-1}, -1)
+	if mu.window(ctx, "Games explorer", {100, 40, 800, 450}) {
+		mu.layout_row(ctx, {-300, -1}, -1)
 		mu.begin_panel(ctx, "Database listing")
 		mu.layout_row(ctx, {100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100})
 		assert(state.viewed_metadata_dataframe != nil)
@@ -1685,6 +1692,10 @@ all_windows :: proc(ctx: ^mu.Context) {
 			slice.fill(arr, 100)
 
 			for key, column in state.viewed_metadata_dataframe{
+				visible, registered := state.db_filtering[key]
+				if !registered || !visible{
+					continue
+				}
 				mu.layout_begin_column(ctx)
 				mu.button(ctx, key)
 				for text in column{
@@ -1696,5 +1707,28 @@ all_windows :: proc(ctx: ^mu.Context) {
 			fmt.eprintln("no game")
 		}
 		mu.end_panel(ctx)
+		mu.layout_begin_column(ctx)
+		mu.layout_row(ctx, {-1}, 10)
+		mu.text(ctx, "Database filtering")
+		mu.layout_height(ctx, -1)
+		mu.begin_panel(ctx, "Database filtering")
+		for key, column in state.viewed_metadata_dataframe{
+			checkbox_state, exists := state.db_filtering[key]
+			if !exists{
+				state.db_filtering[key] = false
+				checkbox_state = false
+			}
+			if .CHANGE in mu.checkbox(ctx, key, &state.db_filtering[key]){
+				num_of_visible_columns := 0
+				for _, val in state.db_filtering{
+					num_of_visible_columns += cast(int)val
+				}
+				if num_of_visible_columns > MAX_VISIBLE_COLUMNS{
+					state.db_filtering[key] = checkbox_state
+				}
+			}
+		}
+		mu.end_panel(ctx)
+		mu.layout_end_column(ctx)
 	}
 }

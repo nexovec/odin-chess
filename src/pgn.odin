@@ -502,10 +502,6 @@ parse_full_game_from_pgn :: proc(reader: ^bufio.Reader, md: ^Metadata_Table = ni
 	if md == nil {
 		expected = token_types{.Move_Number}
 	}
-	pgn_parsed_game_destroy :: proc(game: ^PGN_Parsed_Game) {
-		// delete_dynamic_array(game.metadatas)
-		delete_dynamic_array(game.moves)
-	}
 	pgn_parsed_game_init(&game)
 	second_half_move: bool
 	for {
