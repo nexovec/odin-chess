@@ -177,8 +177,10 @@ PGN_Metadata :: struct {
 }
 Empty_Line :: distinct struct {}
 
+INVALID_TOKEN :: distinct bool
 // VITAL NOTE: the following union and enum are coupled together, MAKE SURE they go in the same respective order.
 PGN_Parser_Token :: union {
+	// INVALID_TOKEN,
 	Move_Number,
 	PGN_Half_Move,
 	Chess_Result,
@@ -187,7 +189,7 @@ PGN_Parser_Token :: union {
 	PGN_Move_Descriptor,
 }
 PGN_Parser_Token_Type :: enum u16 {
-	None,
+	None = 0,
 	Move_Number,
 	PGN_Half_Move,
 	Chess_Result,
@@ -196,12 +198,12 @@ PGN_Parser_Token_Type :: enum u16 {
 	PGN_Move_Descriptor,
 }
 
-PGN_Parsing_Error :: enum {
-	Unspecified,
-	None,
-	Couldnt_Read,
-	Syntax_Error,
-}
+// PGN_Parsing_Error :: enum {
+// 	Unspecified,
+// 	None,
+// 	Couldnt_Read,
+// 	Syntax_Error,
+// }
 
 // NOTE: it consumes the thing if it contains the thing. It returns the first match.
 reader_startswith :: proc(reader: ^bufio.Reader, compared_strings: []string) -> (index_of_match: int, success: bool) {
@@ -267,26 +269,31 @@ strip_variations :: proc(reader: ^bufio.Reader) -> (did_consume: bool, did_err: 
 	}
 }
 
-parse_pgn_token :: proc(reader: ^bufio.Reader) -> (result: PGN_Parser_Token, e: PGN_Parsing_Error) {
+parse_pgn_token :: proc(reader: ^bufio.Reader) -> (result: PGN_Parser_Token, err: io.Error) {
+	DEBUG_default_result := result
 	// skip an optional space, return Empty_Line if there's an empty line
 	{
-		bytes, err := bufio.reader_peek(reader, 1)
+		bytes: []byte
+		bytes, err = bufio.reader_peek(reader, 1)
 		if err != .None {
-			e = .Couldnt_Read
 			return
 		}
 		c := bytes[0]
 		if c == '\r' {
 			bufio.reader_read_byte(reader)
-			result, e = parse_pgn_token(reader)
+			result, err = parse_pgn_token(reader)
 			return
 		}
 		switch c {
 		case ' ':
-			bufio.reader_read_byte(reader)
+			_, err = bufio.reader_read_byte(reader)
 		case '\n':
-			bufio.reader_read_byte(reader)
-			l, err := bufio.reader_peek(reader, 1)
+			_, err = bufio.reader_read_byte(reader)
+			l:[]byte
+			l, err = bufio.reader_peek(reader, 1)
+			if err != .None{
+				return
+			}
 			if err == .None {
 				counter := 0
 				if l[counter] == '\r' {
@@ -299,10 +306,9 @@ parse_pgn_token :: proc(reader: ^bufio.Reader) -> (result: PGN_Parser_Token, e: 
 				if l[counter] == '\n' {
 					counter += 1
 					for ; counter != 0; counter -= 1 {
-						bufio.reader_read_byte(reader)
+						_, err = bufio.reader_read_byte(reader)
 					}
 					result = Empty_Line{}
-					e = .None
 					return
 				}
 			}
@@ -311,9 +317,9 @@ parse_pgn_token :: proc(reader: ^bufio.Reader) -> (result: PGN_Parser_Token, e: 
 
 	// strip move descriptors
 	{
-		bytes, err := bufio.reader_peek(reader, 1)
+		bytes:[]byte
+		bytes, err = bufio.reader_peek(reader, 1)
 		if err != .None {
-			e = .Couldnt_Read
 			return
 		}
 		c := bytes[0]
@@ -321,12 +327,7 @@ parse_pgn_token :: proc(reader: ^bufio.Reader) -> (result: PGN_Parser_Token, e: 
 			result = PGN_Move_Descriptor{}
 			for c != ' ' && c != '\r' && c != '\n' && c != '\t' {
 				c, err = bufio.reader_read_byte(reader)
-				slice := []byte{c}
-				if err != .None && err != .EOF {
-					e = PGN_Parsing_Error.Couldnt_Read
-					return
-				} else if err == .EOF {
-					e = PGN_Parsing_Error.Couldnt_Read
+				if err != .None{
 					return
 				}
 			}
@@ -335,7 +336,6 @@ parse_pgn_token :: proc(reader: ^bufio.Reader) -> (result: PGN_Parser_Token, e: 
 				panic("This should be impossible")
 			}
 			result = PGN_Move_Descriptor{}
-			e = .None
 			return
 		}
 	}
@@ -343,8 +343,8 @@ parse_pgn_token :: proc(reader: ^bufio.Reader) -> (result: PGN_Parser_Token, e: 
 	// strip variations(and comments, for now)
 	did_consume, did_err := strip_variations(reader)
 	if did_err {
-		e = PGN_Parsing_Error.Syntax_Error
-		return
+		panic("Error while stripping variations")
+		// return
 	}
 	if did_consume {
 		return parse_pgn_token(reader)
@@ -356,7 +356,6 @@ parse_pgn_token :: proc(reader: ^bufio.Reader) -> (result: PGN_Parser_Token, e: 
 
 	i, s := reader_startswith(reader, result_strings)
 	if s {
-		e = .None
 		result = corresponding_val[i]
 		return
 	}
@@ -365,9 +364,11 @@ parse_pgn_token :: proc(reader: ^bufio.Reader) -> (result: PGN_Parser_Token, e: 
 	move_number, read_success := reader_read_integer(reader)
 	if read_success {
 		c, err := bufio.reader_read_byte(reader)
-		e = .None
-		if err != .None || c != '.' {
-			e = .Syntax_Error
+		if err != .None {
+			return
+		}
+		if c != '.' {
+			err = io.Error.No_Progress
 		}
 		result = cast(Move_Number)move_number
 
@@ -390,13 +391,10 @@ parse_pgn_token :: proc(reader: ^bufio.Reader) -> (result: PGN_Parser_Token, e: 
 	// detect half moves
 	move, read := parse_half_move_from_pgn(reader)
 	if read {
-		opt_move_postfix, err_postfix := bufio.reader_read_byte(reader)
+		opt_move_postfix: byte
+		opt_move_postfix, err = bufio.reader_read_byte(reader)
 		result = move
-		e = .None
-		if err_postfix == .EOF {
-			return
-		} else if err_postfix != .None {
-			e = .Couldnt_Read
+		if err != .None{
 			return
 		}
 		switch opt_move_postfix {
@@ -414,7 +412,7 @@ parse_pgn_token :: proc(reader: ^bufio.Reader) -> (result: PGN_Parser_Token, e: 
 			move.is_mate = true
 		case:
 			// fmt.eprintln("unknown postfix", opt_move_postfix)
-			e = .Syntax_Error
+			err = io.Error.No_Progress
 			return
 		}
 		return
@@ -429,9 +427,9 @@ parse_pgn_token :: proc(reader: ^bufio.Reader) -> (result: PGN_Parser_Token, e: 
 	// fmt.eprintln("parsing metadata")
 	key_bytes := make([dynamic]byte, 0)
 	for {
-		c, c_err := bufio.reader_read_byte(reader)
-		if c_err != .None {
-			e = .Couldnt_Read
+		c: byte
+		c, err = bufio.reader_read_byte(reader)
+		if err != .None {
 			return
 		}
 		if c == ' ' {
@@ -440,21 +438,21 @@ parse_pgn_token :: proc(reader: ^bufio.Reader) -> (result: PGN_Parser_Token, e: 
 		append(&key_bytes, c)
 	}
 	{
-		c, c_err := bufio.reader_read_byte(reader)
-		if c_err != .None {
-			e = .Couldnt_Read
+		c:byte
+		c, err = bufio.reader_read_byte(reader)
+		if err != .None{
 			return
 		}
 		if c != '\"' {
-			e = .Syntax_Error
+			err = io.Error.No_Progress
 			return
 		}
 	}
 	val_bytes := make([dynamic]byte, 0)
 	for {
-		c, c_err := bufio.reader_read_byte(reader)
-		if c_err != .None {
-			e = .Couldnt_Read
+		c:byte
+		c, err = bufio.reader_read_byte(reader)
+		if err != .None{
 			return
 		}
 		if c == '"' {
@@ -463,20 +461,25 @@ parse_pgn_token :: proc(reader: ^bufio.Reader) -> (result: PGN_Parser_Token, e: 
 		append(&val_bytes, c)
 	}
 	{
-		val_c, val_c_err := bufio.reader_read_byte(reader)
-		if val_c_err != .None {
-			e = .Couldnt_Read
+		val_c: byte
+		val_c, err = bufio.reader_read_byte(reader)
+		if err != .None {
 			return
 		}
 		if val_c != ']' {
-			e = .Syntax_Error
+			err = io.Error.No_Progress
 			return
 		}
 		result = PGN_Metadata {
 			key   = transmute(string)key_bytes[:],
 			value = transmute(string)val_bytes[:],
 		}
-		e = .None
+	}
+
+	tag_1 := reflect.get_union_variant_raw_tag(result)
+	tag_2 := reflect.get_union_variant_raw_tag(DEBUG_default_result)
+	if tag_1 == tag_2{
+		fmt.eprintln("pgn token parse fell through")
 	}
 	return
 }
@@ -507,13 +510,15 @@ parse_full_game_from_pgn :: proc(reader: ^bufio.Reader, md: ^Metadata_Table = ni
 	for {
 		token, token_read := parse_pgn_token(reader)
 		if token_read != .None {
-			fmt.eprintln("Couldn't read token,", token_read)
+			fmt.eprintln("Encountered error while parsing pgn", token_read)
 			break
 		}
 		raw_tag := reflect.get_union_variant_raw_tag(token)
 		tag := transmute(PGN_Parser_Token_Type)cast(u16)raw_tag
 		if tag == PGN_Parser_Token_Type.None {
-			panic("This is a bug, report to developer!")
+			desc := "This is a bug, report to developer!"
+			err_txt := fmt.tprintln(desc, tag, token)
+			panic(err_txt)
 		}
 		if tag not_in expected {
 			fmt.eprintln(
@@ -524,6 +529,8 @@ parse_full_game_from_pgn :: proc(reader: ^bufio.Reader, md: ^Metadata_Table = ni
 			break
 		}
 		switch t in token {
+		// case INVALID_TOKEN:
+		// 	panic("Invalid token reached")
 		case Move_Number:
 			expected = token_types{.PGN_Half_Move}
 		case PGN_Half_Move:

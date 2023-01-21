@@ -202,7 +202,7 @@ parsing_pgn_tokens :: proc(_: ^testing.T) {
 		reader: ^bufio.Reader,
 		string_reader: ^strings.Reader,
 		thing: string,
-		expected_err: PGN_Parsing_Error = .None,
+		expected_err: io.Error = .None,
 	) -> PGN_Parser_Token {
 		reader_init_from_string(thing, string_reader, reader)
 		// skip_characters_in_set_strings_variant(&r, skipped_strings[:])
@@ -217,7 +217,7 @@ parsing_pgn_tokens :: proc(_: ^testing.T) {
 	fmt.eprintln("TEST parsing .pgn chess results as tokens successful")
 	parse_token_from_string_test(&r, &string_reader, `e4`)
 	fmt.eprintln("TEST parsing .pgn chess moves as tokens successful")
-	parse_token_from_string_test(&r, &string_reader, `$32`, .Couldnt_Read)
+	parse_token_from_string_test(&r, &string_reader, `$32`, .No_Progress)
 	fmt.eprintln("TEST parsing pgn chess move descriptor as tokens successful")
 
 	{
