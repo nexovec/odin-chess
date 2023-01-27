@@ -826,6 +826,16 @@ main :: proc() {
 				if e.type == .KEYUP && e.key.keysym.sym == .ESCAPE {
 					SDL.PushEvent(&SDL.Event{type = .QUIT})
 				}
+				if e.type == .KEYDOWN && e.key.keysym.sym == .F11 {
+					flags := SDL.GetWindowFlags(window)
+					flags_casted := transmute(SDL.WindowFlags)flags
+					if .FULLSCREEN in flags_casted{
+						SDL.SetWindowFullscreen(window, {.RESIZABLE, .SHOWN})
+					}
+					else{
+						SDL.SetWindowFullscreen(window, {.FULLSCREEN, .RESIZABLE, .SHOWN})
+					}
+				}
 
 				fn := mu.input_key_down if e.type == .KEYDOWN else mu.input_key_up
 
@@ -1157,6 +1167,7 @@ nav_menu_open_file :: proc(games: ^[dynamic]PGN_Parsed_Game, filepath: string) {
 		}
 	}
 	reader_loop: for {
+		peek, er := bufio.reader_peek(&reader, 20)
 		game, success := parse_full_game_from_pgn(&reader, &state.viewed_metadata_dataframe)
 		if !success {
 			break

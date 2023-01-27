@@ -6,12 +6,12 @@ import io "core:io"
 import reflect "core:reflect"
 
 /* reads a delimited move(without annotations) from the string, doesn't consume the delimiter, result is NULL terminated*/
-consume_delimited_move :: proc(reader: ^bufio.Reader, move_string_backing_buffer: ^[5]byte) -> ([]byte, bool) {
+consume_delimited_move :: proc(reader: ^bufio.Reader, move_string_backing_buffer: ^[6]byte) -> ([]byte, bool) {
 	i := 0
 	for i < 6 {
 		c, err := bufio.reader_read_byte(reader)
 		if err == .EOF {
-			return move_string_backing_buffer[:i], true
+			return move_string_backing_buffer[:i], i != 0
 		}
 		if err != .None {
 			return move_string_backing_buffer[:0], false
@@ -26,10 +26,13 @@ consume_delimited_move :: proc(reader: ^bufio.Reader, move_string_backing_buffer
 			}
 			bufio.reader_unread_byte(reader)
 			return move_string_backing_buffer[:i], true
-		}
-		if i == 5 {
-			fmt.eprintln(err, rune(c))
-			panic("This isn't supposed to happen")
+		case '=':
+		case '1'..='8':
+		case 'a'..='z':
+		case 'A'..='Z':
+		case '-':
+		case:
+			return move_string_backing_buffer[:], i != 0
 		}
 		move_string_backing_buffer[i] = c
 		i += 1
@@ -57,7 +60,7 @@ get_piece_type_from_pgn_character :: proc(character: byte) -> (piece_type: Piece
 	return
 }
 parse_half_move_from_pgn :: proc(reader: ^bufio.Reader) -> (move: PGN_Half_Move = {}, success: bool, err_localized_notation: bool) {
-	buf: [5]byte = {}
+	buf: [6]byte = {}
 	move_bytes, consume_success := consume_delimited_move(reader, &buf)
 	// assert(consume_success, transmute(string)move_bytes)
 	if !consume_success {
@@ -92,13 +95,21 @@ parse_half_move_from_pgn :: proc(reader: ^bufio.Reader) -> (move: PGN_Half_Move 
 	} else if len(move_string) == 4 {
 		#partial switch move.piece_type {
 		case .Pawn:
-			if move_string[1] != 'x' {
+			// parse things like f8=Q
+			if move_string[1] == '8' && move_string[2] == '='{
+				move.src_x = move_string[0] - 'a'
+				move.src_y = 6
+				move.dst = Chessboard_location{move_string[1] - 'a', 7}
+			}
+			else if move_string[1] == 'x' {
+				move.src_x = move_string[0] - 'a'
+				move.is_takes = true
+				move.known_src_column = true
+				move.dst = Chessboard_location{move_string[2] - 'a', move_string[3] - '1'}
+			}
+			else{
 				return
 			}
-			move.src_x = move_string[0] - 'a'
-			move.is_takes = true
-			move.known_src_column = true
-			move.dst = Chessboard_location{move_string[2] - 'a', move_string[3] - '1'}
 		case:
 			switch move_string[1] {
 			case 'a' ..= 'h':
@@ -128,7 +139,16 @@ parse_half_move_from_pgn :: proc(reader: ^bufio.Reader) -> (move: PGN_Half_Move 
 			return
 		}
 		move.dst = Chessboard_location{move_string[3] - 'a', move_string[4] - '1'}
-	} else {
+	} else if len(move_string) == 6{
+		// parse things like gxf8=Q
+		if !(move_string[3] == '8' && move_string[4] == '='){
+			return
+		}
+		move.src_x = move_string[0] - 'a'
+		move.src_y = 6
+		move.known_src_column = true
+		move.dst = Chessboard_location{move_string[2] - 'a', 7}
+	}else {
 		panic("This is impossible.")
 	}
 	if len(move_string)>2 && move.piece_type != .Pawn{
@@ -266,13 +286,18 @@ strip_variations :: proc(reader: ^bufio.Reader) -> (did_consume: bool, did_err: 
 		}
 	}
 }
-// !! FIXME: this returns .None, nil; this should never happen, I don't even know how io.Error can ever be nil
 parse_pgn_token :: proc(reader: ^bufio.Reader) -> (result: PGN_Parser_Token, err: io.Error) {
 	DEBUG_default_result := result
 	// skip an optional space, return Empty_Line if there's an empty line
 	{
 		bytes: []byte
 		bytes, err = bufio.reader_peek(reader, 1)
+		// fmt.eprintln("peek:", bytes, "error:", err)
+		if err == .No_Progress{
+			err = .None
+			result = Empty_Line{}
+			return
+		}
 		if err != .None {
 			return
 		}
@@ -369,6 +394,7 @@ parse_pgn_token :: proc(reader: ^bufio.Reader) -> (result: PGN_Parser_Token, err
 			return
 		}
 		if c != '.' {
+			// fmt.eprintln("Move number not terminated with a '.'")
 			err = io.Error.No_Progress
 		}
 		result = cast(Move_Number)move_number
@@ -451,6 +477,7 @@ parse_pgn_token :: proc(reader: ^bufio.Reader) -> (result: PGN_Parser_Token, err
 			return
 		}
 		if c != '\"' {
+			// fmt.eprintln("There was no progress")
 			err = io.Error.No_Progress
 			return
 		}
@@ -474,6 +501,7 @@ parse_pgn_token :: proc(reader: ^bufio.Reader) -> (result: PGN_Parser_Token, err
 			return
 		}
 		if val_c != ']' {
+			// fmt.eprintln("No end of comment")
 			err = io.Error.No_Progress
 			return
 		}
@@ -532,8 +560,9 @@ parse_full_game_from_pgn :: proc(reader: ^bufio.Reader, md: ^Metadata_Table = ni
 			panic(err_txt)
 		}
 		if tag not_in expected {
+			peeked, er := bufio.reader_peek(reader, 15)
 			fmt.eprintln(
-				args = {"Unexpected token type: <actual, expected>", tag, expected},
+				args = {"Unexpected token type: <actual, expected>", tag, expected, peeked, er},
 				sep = ", ",
 			)
 			success = false

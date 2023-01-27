@@ -1,13 +1,14 @@
 package main
 import bufio "core:bufio"
-import c "core:c"
-import "core:reflect"
 import io "core:io"
 import testing "core:testing"
 import strings "core:strings"
 import fmt "core:fmt"
-import "core:runtime"
-import "core:strconv"
+
+// import c "core:c"
+// import "core:reflect"
+// import "core:runtime"
+// import "core:strconv"
 
 
 @(private = "file")
