@@ -10,6 +10,10 @@ A minimalist chess gui for managing databases with emphasis on performance.
 - [ ] fullscreen mode
 - [ ] importing positions
   - [x] pgn (partially done)
+    - [ ] old notation
+    - [ ] localized notation
+    - [ ] read annotations
+    - [ ] read comments
   - [ ] fen
 - [ ] advanced filtering
   - [ ] same position

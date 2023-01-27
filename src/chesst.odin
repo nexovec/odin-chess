@@ -1263,7 +1263,7 @@ construct_pgn_view_description :: proc(builder: ^strings.Builder) -> string {
 	return transmute(string)builder.buf[:]
 }
 
-open_and_view_pgn_db :: proc(filepath := "data/carlsen_black.pgn"){
+open_and_view_pgn_db :: proc(filepath := "data/Small.pgn"){
 	nav_menu_open_file(state.loaded_db.games, filepath)
 	state.loaded_db.name = filepath
 	if len(state.loaded_db.games) > 0 {

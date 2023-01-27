@@ -56,7 +56,7 @@ get_piece_type_from_pgn_character :: proc(character: byte) -> (piece_type: Piece
 	}
 	return
 }
-parse_half_move_from_pgn :: proc(reader: ^bufio.Reader) -> (move: PGN_Half_Move = {}, success: bool = false) {
+parse_half_move_from_pgn :: proc(reader: ^bufio.Reader) -> (move: PGN_Half_Move = {}, success: bool, err_localized_notation: bool) {
 	buf: [5]byte = {}
 	move_bytes, consume_success := consume_delimited_move(reader, &buf)
 	// assert(consume_success, transmute(string)move_bytes)
@@ -79,9 +79,10 @@ parse_half_move_from_pgn :: proc(reader: ^bufio.Reader) -> (move: PGN_Half_Move 
 	// move parsing
 	s: bool
 	move.piece_type, s = get_piece_type_from_pgn_character(move_bytes[0])
-	if s == false {
-		return
-	}
+	// if s == false {
+	// 	fmt.eprintln("You're likely using a localized chess notation.")
+	// 	return
+	// }
 	if len(move_string) == 2 {
 		if move.piece_type != .Pawn {
 			return
@@ -92,6 +93,7 @@ parse_half_move_from_pgn :: proc(reader: ^bufio.Reader) -> (move: PGN_Half_Move 
 			return
 		}
 		move.dst = Chessboard_location{move_string[1] - 'a', move_string[2] - '1'}
+		err_localized_notation = !s
 	} else if len(move_string) == 4 {
 		#partial switch move.piece_type {
 		case .Pawn:
@@ -116,6 +118,7 @@ parse_half_move_from_pgn :: proc(reader: ^bufio.Reader) -> (move: PGN_Half_Move 
 				return
 			}
 			move.dst = Chessboard_location{move_string[2] - 'a', move_string[3] - '1'}
+			err_localized_notation = !s
 		}
 		// fmt.println(move.piece_type, "takes on", rune(move.dest_x), rune(move.dest_y))
 	} else if len(move_string) == 5 {
@@ -132,6 +135,7 @@ parse_half_move_from_pgn :: proc(reader: ^bufio.Reader) -> (move: PGN_Half_Move 
 			return
 		}
 		move.dst = Chessboard_location{move_string[3] - 'a', move_string[4] - '1'}
+		err_localized_notation = !s
 		// fmt.println(move.piece_type, " long form takes on", rune(move.dest_x), rune(move.dest_y))
 	} else {
 		panic("This is impossible.")
@@ -268,7 +272,7 @@ strip_variations :: proc(reader: ^bufio.Reader) -> (did_consume: bool, did_err: 
 		}
 	}
 }
-
+// !! FIXME: this returns .None, nil; this should never happen, I don't even know how io.Error can ever be nil
 parse_pgn_token :: proc(reader: ^bufio.Reader) -> (result: PGN_Parser_Token, err: io.Error) {
 	DEBUG_default_result := result
 	// skip an optional space, return Empty_Line if there's an empty line
@@ -307,6 +311,9 @@ parse_pgn_token :: proc(reader: ^bufio.Reader) -> (result: PGN_Parser_Token, err
 					counter += 1
 					for ; counter != 0; counter -= 1 {
 						_, err = bufio.reader_read_byte(reader)
+						if err != .None{
+							return
+						}
 					}
 					result = Empty_Line{}
 					return
@@ -381,15 +388,21 @@ parse_pgn_token :: proc(reader: ^bufio.Reader) -> (result: PGN_Parser_Token, err
 		bytes, err = bufio.reader_peek(reader, 2)
 		if transmute(string)bytes == ".." {
 			// this is a continuation sequence, skipping
-			bufio.reader_read_byte(reader)
-			bufio.reader_read_byte(reader)
+			_, err = bufio.reader_read_byte(reader)
+			assert(err == .None)
+			_, err = bufio.reader_read_byte(reader)
+			assert(err == .None)
 			return parse_pgn_token(reader)
 		}
 		return
 	}
 
 	// detect half moves
-	move, read := parse_half_move_from_pgn(reader)
+	move, read, err_localized_notation_unsupported := parse_half_move_from_pgn(reader)
+	if err_localized_notation_unsupported{
+		err = io.Error.Negative_Read
+		return
+	}
 	if read {
 		opt_move_postfix: byte
 		opt_move_postfix, err = bufio.reader_read_byte(reader)
@@ -508,16 +521,20 @@ parse_full_game_from_pgn :: proc(reader: ^bufio.Reader, md: ^Metadata_Table = ni
 	pgn_parsed_game_init(&game)
 	second_half_move: bool
 	for {
-		token, token_read := parse_pgn_token(reader)
-		if token_read != .None {
-			fmt.eprintln("Encountered error while parsing pgn", token_read)
+		token, token_read_err := parse_pgn_token(reader)
+		if token_read_err == io.Error.Negative_Read{
+			panic("Your pgn file likely uses localized notation(or it is invalid)")
+		}
+		if token_read_err != .None {
+			fmt.eprintln("Encountered error while parsing pgn", token_read_err)
 			break
 		}
 		raw_tag := reflect.get_union_variant_raw_tag(token)
 		tag := transmute(PGN_Parser_Token_Type)cast(u16)raw_tag
 		if tag == PGN_Parser_Token_Type.None {
-			desc := "This is a bug, report to developer!"
-			err_txt := fmt.tprintln(desc, tag, token)
+			desc := "Your pgn database is invalid. This is unsupported!"
+			peek, peek_err := bufio.reader_peek(reader, 20)
+			err_txt := fmt.tprintln(desc, tag, token, "reading error:", peek_err, "\nnext characters:", transmute(string)peek)
 			panic(err_txt)
 		}
 		if tag not_in expected {

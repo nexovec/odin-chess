@@ -155,42 +155,42 @@ pgn_half_move_parsing :: proc(_: ^testing.T) {
 	}
 	{
 		reader_init_from_string(`ed4`, &string_reader, &r)
-		thing, success := parse_half_move_from_pgn(&r)
+		thing, success, e := parse_half_move_from_pgn(&r)
 		assert(success == false, fmt.tprintln("test failed", thing)) // this should be unsuccessful, because `ed4` is not a valid half move
 	}
 	{
 		reader_init_from_string(`Rd4`, &string_reader, &r)
-		thing, success := parse_half_move_from_pgn(&r)
+		thing, success, e := parse_half_move_from_pgn(&r)
 		assert(success)
 		assert(thing.piece_type == .Rook)
 	}
 	{
 		reader_init_from_string(`Rbe4`, &string_reader, &r)
-		thing, success := parse_half_move_from_pgn(&r)
+		thing, success, e := parse_half_move_from_pgn(&r)
 		assert(success)
 		assert(thing.piece_type == .Rook)
 	}
 	{
 		reader_init_from_string(`exd4`, &string_reader, &r)
-		thing, success := parse_half_move_from_pgn(&r)
+		thing, success, e := parse_half_move_from_pgn(&r)
 		assert(success)
 		assert(thing.piece_type == .Pawn)
 	}
 	{
 		reader_init_from_string(`Rbxe4`, &string_reader, &r)
-		thing, success := parse_half_move_from_pgn(&r)
+		thing, success, e := parse_half_move_from_pgn(&r)
 		assert(success)
 		assert(thing.piece_type == .Rook)
 	}
 	{
 		reader_init_from_string(`O-O-O`, &string_reader, &r)
-		thing, success := parse_half_move_from_pgn(&r)
+		thing, success, e := parse_half_move_from_pgn(&r)
 		assert(success)
 		assert(thing.is_qside_castles)
 	}
 	{
 		reader_init_from_string(`O-O`, &string_reader, &r)
-		thing, success := parse_half_move_from_pgn(&r)
+		thing, success, e := parse_half_move_from_pgn(&r)
 		assert(success)
 		assert(thing.is_kside_castles)
 	}
