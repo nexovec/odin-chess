@@ -79,10 +79,6 @@ parse_half_move_from_pgn :: proc(reader: ^bufio.Reader) -> (move: PGN_Half_Move 
 	// move parsing
 	s: bool
 	move.piece_type, s = get_piece_type_from_pgn_character(move_bytes[0])
-	// if s == false {
-	// 	fmt.eprintln("You're likely using a localized chess notation.")
-	// 	return
-	// }
 	if len(move_string) == 2 {
 		if move.piece_type != .Pawn {
 			return
@@ -93,7 +89,6 @@ parse_half_move_from_pgn :: proc(reader: ^bufio.Reader) -> (move: PGN_Half_Move 
 			return
 		}
 		move.dst = Chessboard_location{move_string[1] - 'a', move_string[2] - '1'}
-		err_localized_notation = !s
 	} else if len(move_string) == 4 {
 		#partial switch move.piece_type {
 		case .Pawn:
@@ -118,9 +113,7 @@ parse_half_move_from_pgn :: proc(reader: ^bufio.Reader) -> (move: PGN_Half_Move 
 				return
 			}
 			move.dst = Chessboard_location{move_string[2] - 'a', move_string[3] - '1'}
-			err_localized_notation = !s
 		}
-		// fmt.println(move.piece_type, "takes on", rune(move.dest_x), rune(move.dest_y))
 	} else if len(move_string) == 5 {
 		if move_string[2] != 'x' {
 			return
@@ -135,10 +128,11 @@ parse_half_move_from_pgn :: proc(reader: ^bufio.Reader) -> (move: PGN_Half_Move 
 			return
 		}
 		move.dst = Chessboard_location{move_string[3] - 'a', move_string[4] - '1'}
-		err_localized_notation = !s
-		// fmt.println(move.piece_type, " long form takes on", rune(move.dest_x), rune(move.dest_y))
 	} else {
 		panic("This is impossible.")
+	}
+	if len(move_string)>2 && move.piece_type != .Pawn{
+		err_localized_notation = !s
 	}
 	success = true
 	return

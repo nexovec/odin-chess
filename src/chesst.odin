@@ -1190,7 +1190,7 @@ Piece_Color :: enum u8 {
 	White,
 }
 Piece_Type :: enum u8 {
-	None,
+	None = 0,
 	Pawn,
 	Rook,
 	Knight,

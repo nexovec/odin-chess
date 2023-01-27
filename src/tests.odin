@@ -207,7 +207,7 @@ parsing_pgn_tokens :: proc(_: ^testing.T) {
 		reader_init_from_string(thing, string_reader, reader)
 		// skip_characters_in_set_strings_variant(&r, skipped_strings[:])
 		token, err := parse_pgn_token(reader)
-		assert(err == expected_err, fmt.tprintln(token))
+		assert(err == expected_err, fmt.tprintln("token:", token, "error:", err))
 		fmt.eprintln("Parsing full moves works")
 		return token
 	}
@@ -215,9 +215,11 @@ parsing_pgn_tokens :: proc(_: ^testing.T) {
 	fmt.eprintln("TEST parsing .pgn move numbers as tokens successful")
 	_ = parse_token_from_string_test(&r, &string_reader, `1-0`).(Chess_Result)
 	fmt.eprintln("TEST parsing .pgn chess results as tokens successful")
-	parse_token_from_string_test(&r, &string_reader, `e4`)
+	parse_token_from_string_test(&r, &string_reader, `e4`, .EOF)
 	fmt.eprintln("TEST parsing .pgn chess moves as tokens successful")
-	parse_token_from_string_test(&r, &string_reader, `$32`, .No_Progress)
+	parse_token_from_string_test(&r, &string_reader, `$32 `, .None)
+	fmt.eprintln("TEST parsing pgn chess move descriptor as tokens successful")
+	parse_token_from_string_test(&r, &string_reader, `$32`, .EOF)
 	fmt.eprintln("TEST parsing pgn chess move descriptor as tokens successful")
 
 	{
