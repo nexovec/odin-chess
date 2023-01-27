@@ -129,7 +129,7 @@ state := struct {
 	viewed_metadata_dataframe: Metadata_Table,
 } {
 	bg = {90, 95, 100, 255},
-	sdl_wsize = Vec2i{960, 540},
+	sdl_wsize = Vec2i{1920, 1080},
 	loaded_db = {"", nil},
 	viewed_metadata_dataframe = nil,
 	ui_ctx = default_ui_ctx,
@@ -579,6 +579,9 @@ main :: proc() {
 		refresh_rate = 30
 	}
 	time_per_tick: u32 = 1000 / cast(u32)refresh_rate
+	if display_mode.w < state.sdl_wsize.x || display_mode.h < state.sdl_wsize.y{
+		state.sdl_wsize = {display_mode.w, display_mode.h}
+	}
 	window := SDL.CreateWindow(
 		"Chesst.exe - chess database explorer",
 		SDL.WINDOWPOS_UNDEFINED,
