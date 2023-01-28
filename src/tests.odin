@@ -77,6 +77,11 @@ reader_init_from_string :: proc(
 	bufio.reader_destroy(reader)
 	bufio.reader_init(reader, r)
 }
+@(test)
+try_import_small_pgn_db :: proc(_: ^testing.T){
+	games := make([dynamic]PGN_Parsed_Game, 0)
+	nav_menu_open_file(&games, "data/carlsen_eng_notation.pgn")
+}
 
 @(test)
 reading_integers_from_bufio_reader :: proc(_: ^testing.T) {
@@ -195,6 +200,12 @@ pgn_half_move_parsing :: proc(_: ^testing.T) {
 		assert(success)
 		assert(thing.is_kside_castles)
 	}
+	{
+		reader_init_from_string(`e1=Q`, &string_reader, &r)
+		thing, success, e := parse_half_move_from_pgn(&r)
+		assert(success)
+		assert(thing.piece_type == .Pawn)
+	}
 }
 
 @(test)
@@ -222,6 +233,10 @@ parsing_pgn_tokens :: proc(_: ^testing.T) {
 	fmt.eprintln("TEST parsing pgn chess move descriptor as tokens successful")
 	parse_token_from_string_test(&r, &string_reader, `$32`, .EOF)
 	fmt.eprintln("TEST parsing pgn chess move descriptor as tokens successful")
+	parse_token_from_string_test(&r, &string_reader, `e1=Q`, .EOF)
+	fmt.eprintln("TEST parsing pgn chess move pawn promotion")
+	parse_token_from_string_test(&r, &string_reader, `e1=Q `, .None)
+	fmt.eprintln("TEST parsing pgn chess move pawn promotion non-terminated")
 
 	{
 		reader_init_from_string(`1. e4 d5 1/2-1/2ok`, &string_reader, &r)
@@ -338,6 +353,7 @@ create_chess_positions :: proc(t: ^testing.T) {
 	md := make(Metadata_Table)
 	sample_game, success := parse_full_game_from_pgn(&r, &md)
 	assert(len(sample_game.moves) > 0)
+	assert(len(sample_game.moves) == 41)
 
 	// chessboard_states := make([dynamic]Chessboard_Info, 0)
 	// append(&chessboard_states, default_chessboard_info())
@@ -346,7 +362,7 @@ create_chess_positions :: proc(t: ^testing.T) {
 	view := PGN_View{}
 	pgn_view_init(&view, &sample_game)
 	for move, index in sample_game.moves {
-		fmt.println(index)
+		// fmt.println(index)
 		advanced, err := pgn_view_next_move(&view, &move_buffer)
 		assert(advanced)
 		assert(err == .None)

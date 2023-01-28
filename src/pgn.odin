@@ -96,10 +96,10 @@ parse_half_move_from_pgn :: proc(reader: ^bufio.Reader) -> (move: PGN_Half_Move 
 		#partial switch move.piece_type {
 		case .Pawn:
 			// parse things like f8=Q
-			if move_string[1] == '8' && move_string[2] == '='{
+			if (move_string[1] == '8' || move_string[1] == '1') && move_string[2] == '='{
 				move.src_x = move_string[0] - 'a'
 				move.src_y = 6
-				move.dst = Chessboard_location{move_string[1] - 'a', 7}
+				move.dst = Chessboard_location{move_string[1] - 'a', move_string[1] - '1'}
 			}
 			else if move_string[1] == 'x' {
 				move.src_x = move_string[0] - 'a'
@@ -141,17 +141,17 @@ parse_half_move_from_pgn :: proc(reader: ^bufio.Reader) -> (move: PGN_Half_Move 
 		move.dst = Chessboard_location{move_string[3] - 'a', move_string[4] - '1'}
 	} else if len(move_string) == 6{
 		// parse things like gxf8=Q
-		if !(move_string[3] == '8' && move_string[4] == '='){
+		if !((move_string[3] == '8' || move_string[3] == '1') && move_string[4] == '='){
 			return
 		}
 		move.src_x = move_string[0] - 'a'
 		move.src_y = 6
 		move.known_src_column = true
-		move.dst = Chessboard_location{move_string[2] - 'a', 7}
+		move.dst = Chessboard_location{move_string[2] - 'a', move_string[3] - '1'}
 	}else {
 		panic("This is impossible.")
 	}
-	if len(move_string)>2 && move.piece_type != .Pawn{
+	if len(move_string) > 2 && move.piece_type != .Pawn{
 		err_localized_notation = !s
 	}
 	success = true
@@ -292,6 +292,9 @@ parse_pgn_token :: proc(reader: ^bufio.Reader) -> (result: PGN_Parser_Token, err
 	{
 		bytes: []byte
 		bytes, err = bufio.reader_peek(reader, 1)
+		if err == .No_Progress{
+			fmt.eprintln("Mysterious No_Progress :O This is a bug.", reader.max_consecutive_empty_reads)
+		}
 		// fmt.eprintln("peek:", bytes, "error:", err)
 		// if err == .No_Progress{
 		// 	err = .None
