@@ -127,6 +127,8 @@ state := struct {
 	sdl_wsize:                 Vec2i,
 	wd:                        string,
 	viewed_metadata_dataframe: Metadata_Table,
+	fullscreen:				   bool,
+	window:					   ^SDL.Window,
 } {
 	bg = {90, 95, 100, 255},
 	sdl_wsize = Vec2i{1920, 1080},
@@ -546,6 +548,21 @@ default_chessboard_info :: proc() -> Chessboard_Info {
 	}
 	return cbinfo
 }
+get_fullscreen_status :: proc() -> bool{
+	flags := SDL.GetWindowFlags(state.window)
+	flags_casted := transmute(SDL.WindowFlags)flags
+	return .FULLSCREEN in flags_casted
+}
+
+toggle_fullscreen :: proc(){
+	is_fs := get_fullscreen_status()
+	flags := SDL.WindowFlags{.RESIZABLE, .SHOWN}
+	if !is_fs{
+		flags += SDL.WindowFlags{.FULLSCREEN}
+	}
+	SDL.SetWindowFullscreen(state.window, flags)
+	state.fullscreen = !state.fullscreen
+}
 
 main :: proc() {
 	fmt.eprintln("STARTING PROGRAM!")
@@ -595,6 +612,7 @@ main :: proc() {
 		return
 	}
 	defer SDL.DestroyWindow(window)
+	state.window = window
 	backend_idx: i32 = -1
 	if n := SDL.GetNumRenderDrivers(); n <= 0 {
 		fmt.eprintln("No render drivers available")
@@ -827,14 +845,7 @@ main :: proc() {
 					SDL.PushEvent(&SDL.Event{type = .QUIT})
 				}
 				if e.type == .KEYDOWN && e.key.keysym.sym == .F11 {
-					flags := SDL.GetWindowFlags(window)
-					flags_casted := transmute(SDL.WindowFlags)flags
-					if .FULLSCREEN in flags_casted{
-						SDL.SetWindowFullscreen(window, {.RESIZABLE, .SHOWN})
-					}
-					else{
-						SDL.SetWindowFullscreen(window, {.FULLSCREEN, .RESIZABLE, .SHOWN})
-					}
+					toggle_fullscreen()
 				}
 
 				fn := mu.input_key_down if e.type == .KEYDOWN else mu.input_key_up
@@ -1300,7 +1311,7 @@ all_windows :: proc(ctx: ^mu.Context) {
 	) {
 		w := mu.get_current_container(ctx)
 		w.rect.w = state.sdl_wsize.x
-		mu.layout_row(ctx, []i32{80, 60, 60}, 0)
+		mu.layout_row(ctx, []i32{80, 60, 60, 60}, 0)
 
 		if .SUBMIT in mu.button(ctx, "File") {
 			mu.open_popup(ctx, "popup")
@@ -1338,6 +1349,17 @@ all_windows :: proc(ctx: ^mu.Context) {
 			mu.button(ctx, "Open template")
 			if .SUBMIT in mu.button(ctx, "Recent...") {
 				mu.label(ctx, "last open editors")
+			}
+			mu.end_popup(ctx)
+		}
+
+		if .SUBMIT in mu.button(ctx, "Options"){
+			mu.open_popup(ctx, "options_suboptions")
+		}
+
+		if mu.begin_popup(ctx, "options_suboptions"){
+			if .CHANGE in mu.checkbox(ctx, "Fullscreen", &state.fullscreen){
+				toggle_fullscreen()
 			}
 			mu.end_popup(ctx)
 		}

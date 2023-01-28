@@ -293,11 +293,11 @@ parse_pgn_token :: proc(reader: ^bufio.Reader) -> (result: PGN_Parser_Token, err
 		bytes: []byte
 		bytes, err = bufio.reader_peek(reader, 1)
 		// fmt.eprintln("peek:", bytes, "error:", err)
-		if err == .No_Progress{
-			err = .None
-			result = Empty_Line{}
-			return
-		}
+		// if err == .No_Progress{
+		// 	err = .None
+		// 	result = Empty_Line{}
+		// 	return
+		// }
 		if err != .None {
 			return
 		}
