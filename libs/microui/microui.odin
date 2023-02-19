@@ -349,7 +349,7 @@ begin :: proc(ctx: ^Context) {
 
 end :: proc(ctx: ^Context) {
 	/* check stacks */
-	assert(ctx.container_stack.idx == 0)
+	assert(ctx.container_stack.idx == 0, fmt.tprintln("stack idx must be 0 but it is", ctx.container_stack.idx))
 	assert(ctx.clip_stack.idx == 0)
 	assert(ctx.id_stack.idx == 0)
 	assert(ctx.layout_stack.idx == 0)
