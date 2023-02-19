@@ -675,6 +675,7 @@ main :: proc() {
 		panic("Couldn't initialize SDL-ttf")
 	}
 	defer SDL_ttf.Quit()
+	assert(os.is_file("assets/fonts/chess_font.ttf"), "Can't find font")
 	chess_font = SDL_ttf.OpenFont("assets/fonts/chess_font.ttf", state.ui_ctx.piece_resolution)
 	if SDL_ttf.GetError() != "" {
 		panic(fmt.tprintln(SDL_ttf.GetError()))
@@ -684,7 +685,7 @@ main :: proc() {
 	// loading chessboard as image
 	SDL_Image.Init(SDL_Image.InitFlags{.JPG, .PNG})
 	defer SDL_Image.Quit()
-	assert(os.is_file("assets/chessbcg.jpeg"), "Can't find assets")
+	assert(os.is_file("assets/chessbcg.jpeg"), "Can't find the background")
 	cb_image = SDL_Image.Load("assets/chessbcg.jpeg")
 
 	if (cb_image == nil) {
