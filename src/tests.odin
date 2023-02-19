@@ -77,8 +77,21 @@ reader_init_from_string :: proc(
 	bufio.reader_destroy(reader)
 	bufio.reader_init(reader, r)
 }
+// this tests for a bug where you get .No_Progress from a bufio.Reader in the test file.
 @(test)
 try_import_small_pgn_db :: proc(_: ^testing.T){
+	// trying to parse the suspect game
+	{
+		suspect_game := `1. e4 d6 2. d4 Nf6 3. Nc3 g6 4. f4 Bg7 5. Nf3 O-O 6. Bd3 Nbd7 7. O-O c5 8. d5
+		Qb6 9. Kh1 Ng4 10. h3 Nh6 11. Qe2 f5 12. e5 Qc7 13. Re1 a6 14. Ng5 Nb6 15. exd6
+		exd6 16. Qe7 Qxe7 17. Rxe7 Nf7 18. Ne6 Bxe6 19. dxe6 Nd8 20. Rxg7+ Kxg7 21. e7
+		Re8 22. exd8=Q Raxd8 23. Bd2 d5 24. Re1 Rxe1+ 25. Bxe1 c4 26. Bf1 d4 27. Nb1 d3
+		28. cxd3 cxd3 29. Ba5 Rd6 30. Bxb6 Rxb6 31. b3 Rd6 32. Nd2 1/2-1/2`
+		reader_init_from_string(suspect_game, &string_reader, &r)
+		parse_full_game_from_pgn(&r)
+		fmt.eprintln("TEST of the suspect game passed")
+	}
+	// trying to parse the entire test file
 	games := make([dynamic]PGN_Parsed_Game, 0)
 	nav_menu_open_file(&games, "data/carlsen_eng_notation.pgn")
 }
