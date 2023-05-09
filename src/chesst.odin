@@ -677,7 +677,12 @@ main :: proc() {
 	defer SDL_ttf.Quit()
 	assert(os.is_file("assets/fonts/chess_font.ttf"), "Can't find font")
 	chess_font = SDL_ttf.OpenFont("assets/fonts/chess_font.ttf", state.ui_ctx.piece_resolution)
-	if SDL_ttf.GetError() != "" {
+
+	// TODO: set platform flag correctly
+	LINUX::true
+
+	if SDL_ttf.GetError() != "" && !(LINUX && SDL_ttf.GetError() =="That operation is not supported"){
+		// linux says it's not possible to open the font, but it works fine, so don't do it
 		panic(fmt.tprintln(SDL_ttf.GetError()))
 	}
 	defer SDL_ttf.CloseFont(chess_font)
