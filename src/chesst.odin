@@ -14,6 +14,8 @@ import strings "core:strings"
 import slice "core:slice"
 
 MAX_VISIBLE_COLUMNS := 16
+// TODO: set platform flag correctly
+LINUX::false
 
 Vec2i :: distinct [2]i32
 
@@ -678,10 +680,10 @@ main :: proc() {
 	assert(os.is_file("assets/fonts/chess_font.ttf"), "Can't find font")
 	chess_font = SDL_ttf.OpenFont("assets/fonts/chess_font.ttf", state.ui_ctx.piece_resolution)
 
-	// TODO: set platform flag correctly
-	LINUX::true
-
-	if SDL_ttf.GetError() != "" && !(LINUX && SDL_ttf.GetError() =="That operation is not supported"){
+	if SDL_ttf.GetError() != "" &&
+		!(LINUX && SDL_ttf.GetError() == "That operation is not supported") &&
+		// This error happend on windows. I don't know what this error is, it doesn't break anything.
+		SDL_ttf.GetError() != "Unknown sensor type"{
 		// linux says it's not possible to open the font, but it works fine, so don't do it
 		panic(fmt.tprintln(SDL_ttf.GetError()))
 	}
