@@ -1343,7 +1343,10 @@ all_windows :: proc(ctx: ^mu.Context) {
 			}
 			mu.button(ctx, "Export")
 			mu.button(ctx, "Chesst files")
-			mu.button(ctx, "Quit")
+			quit_btn := mu.button(ctx, "Quit")
+			if .SUBMIT in quit_btn {
+				SDL.PushEvent(&SDL.Event{type = .QUIT})
+			}
 			mu.end_popup(ctx)
 		}
 
