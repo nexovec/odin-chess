@@ -4,10 +4,13 @@
 			"path": "."
 		},
 		{
-			"path": "../../src/Odin/core"
+			"path": "../Odin/core"
 		},
 		{
-			"path": "../../src/Odin/vendor"
+			"path": "../Odin/examples"
+		},
+		{
+			"path": "../Odin/vendor"
 		}
 	],
 	"settings": {}
