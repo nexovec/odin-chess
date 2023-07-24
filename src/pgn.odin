@@ -1,15 +1,17 @@
 package main
 import bufio "core:bufio"
 import fmt "core:fmt"
+import utf8 "core:unicode/utf8"
 import strconv "core:strconv"
 import io "core:io"
+import strings "core:strings"
 import reflect "core:reflect"
 
 /* reads a delimited move(without annotations) from the string, doesn't consume the delimiter, result is NULL terminated*/
-consume_delimited_move :: proc(reader: ^bufio.Reader, move_string_backing_buffer: ^[6]byte) -> ([]byte, bool) {
+consume_delimited_move :: proc(reader: ^bufio.Reader, move_string_backing_buffer: ^[6]rune) -> ([]rune, bool) {
 	i := 0
 	for i < 6 {
-		c, err := bufio.reader_read_byte(reader)
+		c, size, err := bufio.reader_read_rune(reader)
 		if err == .EOF {
 			return move_string_backing_buffer[:i], i != 0
 		}
@@ -40,38 +42,128 @@ consume_delimited_move :: proc(reader: ^bufio.Reader, move_string_backing_buffer
 	return move_string_backing_buffer[:0], false
 }
 
-get_piece_type_from_pgn_character :: proc(character: byte) -> (piece_type: Piece_Type, success: bool = true) {
-	switch character {
-	case 'R':
-		piece_type = .Rook
-	case 'N':
-		piece_type = .Knight
-	case 'B':
-		piece_type = .Bishop
-	case 'K':
-		piece_type = .King
-	case 'Q':
-		piece_type = .Queen
-	case 'a' ..= 'h':
-		piece_type = .Pawn
-	case:
-		success = false
+get_piece_type_from_pgn_character :: proc(character: rune) -> (piece_type: Piece_Type, success: bool = true) {
+	Piece_Type_Notation_Supported_Languages :: enum {
+		English,
+		German,
+		Spanish,
+		Russian,
+		Italian,
+		French,
+		Portuguese,
+		Dutch,
+	}
+	piece_type_notation_translations := map[Piece_Type_Notation_Supported_Languages]map[Piece_Type]rune{
+		.English = {
+			.Rook = 'R',
+			.Knight = 'N',
+			.Bishop = 'B',
+			.King = 'K',
+			.Queen = 'Q',
+		},
+		.Russian = {
+			.Rook = 'Л',
+			.Knight = 'К',
+			.Bishop = 'С',
+			.King = 'К',
+			.Queen = 'Ф',
+		},
+		.German = {
+			.Rook = 'T',
+			.Knight = 'S',
+			.Bishop = 'L',
+			.King = 'K',
+			.Queen = 'D',
+		},
+		.Spanish = {
+			.Rook = 'T',
+			.Knight = 'C',
+			.Bishop = 'A',
+			.King = 'R',
+			.Queen = 'D',
+		},
+		.Italian = {
+			.Rook = 'T',
+			.Knight = 'C',
+			.Bishop = 'A',
+			.King = 'R',
+			.Queen = 'D',
+		},
+		.French = {
+			.Rook = 'T',
+			.Knight = 'C',
+			.Bishop = 'F',
+			.King = 'R',
+			.Queen = 'D',
+		},
+		.Portuguese = {
+			.Rook = 'T',
+			.Knight = 'C',
+			.Bishop = 'B',
+			.King = 'R',
+			.Queen = 'D',
+		},
+		.Dutch = {
+			.Rook = 'T',
+			.Knight = 'P',
+			.Bishop = 'L',
+			.King = 'K',
+			.Queen = 'D',
+		},
+	}
+	supported_notations := [?]Piece_Type_Notation_Supported_Languages{.English, .German}
+	// TODO: cache the chosen language for the particular game, reparse if error occurs for every notation translation
+	for language in supported_notations{
+		piece_type_notation := piece_type_notation_translations[language]
+		switch character {
+		case piece_type_notation[.Rook]:
+			piece_type = .Rook
+		case piece_type_notation[.Knight]:
+			piece_type = .Knight
+		case piece_type_notation[.Bishop]:
+			piece_type = .Bishop
+		case piece_type_notation[.King]:
+			piece_type = .King
+		case piece_type_notation[.Queen]:
+			piece_type = .Queen
+		case 'a' ..= 'h':
+			piece_type = .Pawn
+		case:
+			success = false
+		}
+		if success {
+			return
+		}
 	}
 	return
 }
 parse_half_move_from_pgn :: proc(reader: ^bufio.Reader) -> (move: PGN_Half_Move = {}, success: bool, err_localized_notation: bool) {
-	buf: [6]byte = {}
-	move_bytes, consume_success := consume_delimited_move(reader, &buf)
-	// assert(consume_success, transmute(string)move_bytes)
+	buf: [6]rune = {}
+	// FIXME: Don't promote to king
+	move_runes, consume_success := consume_delimited_move(reader, &buf)
+	// assert(consume_success, transmute(string)move_runes)
 	if !consume_success {
 		return
 	}
-	move_string := cast(string)move_bytes
+	// move_string := transmute(string)move_runes
 
 	// castling
-	if move_string == "O-O-O" {
+	compare_rune_string :: proc(r:[]rune, s:string) -> bool {
+		if len(r) != len(s){
+			return false
+		}
+		for c, i in s{
+			if r[i] != c{
+				return false
+			}
+		}
+		return true
+	}
+	if compare_rune_string(move_runes, "O-O-O"){
+	// if move_runes == "O-O-O" {
 		move.is_qside_castles = true
-	} else if move_string == "O-O" {
+	} else if compare_rune_string(move_runes, "O-O"){
+	// } else if move_runes == "O-O" {
 		move.is_kside_castles = true
 	}
 	if move.is_kside_castles || move.is_qside_castles {
@@ -81,56 +173,59 @@ parse_half_move_from_pgn :: proc(reader: ^bufio.Reader) -> (move: PGN_Half_Move 
 
 	// move parsing
 	s: bool
-	move.piece_type, s = get_piece_type_from_pgn_character(move_bytes[0])
-	if len(move_string) == 2 {
+	move.piece_type, s = get_piece_type_from_pgn_character(move_runes[0])
+	if len(move_runes) == 2 {
 		if move.piece_type != .Pawn {
 			return
 		}
-		move.dst = Chessboard_location{move_string[0] - 'a', move_string[1] - '1'}
-	} else if len(move_string) == 3 {
+		move.dst = Chessboard_location{cast(byte)move_runes[0] - 'a', cast(byte)move_runes[1] - '1'}
+	} else if len(move_runes) == 3 {
 		if move.piece_type == .Pawn {
 			return
 		}
-		move.dst = Chessboard_location{move_string[1] - 'a', move_string[2] - '1'}
-	} else if len(move_string) == 4 {
+		move.dst = Chessboard_location{cast(byte)move_runes[1] - 'a', cast(byte)move_runes[2] - '1'}
+	} else if len(move_runes) == 4 {
 		#partial switch move.piece_type {
 		case .Pawn:
 			// parse things like f8=Q
-			if (move_string[1] == '8' || move_string[1] == '1') && move_string[2] == '='{
-				move.src_x = move_string[0] - 'a'
+			if (cast(byte)move_runes[1] == '8' || cast(byte)move_runes[1] == '1') && cast(byte)move_runes[2] == '='{
+				move.src_x = cast(byte)move_runes[0] - 'a'
 				move.src_y = 6
-				move.dst = Chessboard_location{move_string[1] - 'a', move_string[1] - '1'}
+				move.dst = Chessboard_location{cast(byte)move_runes[1] - 'a', cast(byte)move_runes[1] - '1'}
+				move.piece_type, success = get_piece_type_from_pgn_character(move_runes[3])
+				assert(success, utf8.runes_to_string(move_runes, context.temp_allocator))
+				assert(move.piece_type != .Pawn)
 			}
-			else if move_string[1] == 'x' {
-				move.src_x = move_string[0] - 'a'
+			else if move_runes[1] == 'x' {
+				move.src_x = cast(byte)move_runes[0] - 'a'
 				move.is_takes = true
 				move.known_src_column = true
-				move.dst = Chessboard_location{move_string[2] - 'a', move_string[3] - '1'}
+				move.dst = Chessboard_location{cast(byte)move_runes[2] - 'a', cast(byte)move_runes[3] - '1'}
 			}
 			else{
 				return
 			}
 		case:
-			switch move_string[1] {
+			switch cast(byte)move_runes[1] {
 			case 'a' ..= 'h':
 				move.known_src_column = true
-				move.src_x = move_string[1] - 'a'
+				move.src_x = cast(byte)move_runes[1] - 'a'
 			case '1' ..= '8':
 				move.known_src_row = true
-				move.src_y = move_string[2] - '1'
+				move.src_y = cast(byte)move_runes[2] - '1'
 			case 'x':
 				move.is_takes = true
 			case:
 				return
 			}
-			move.dst = Chessboard_location{move_string[2] - 'a', move_string[3] - '1'}
+			move.dst = Chessboard_location{cast(byte)move_runes[2] - 'a', cast(byte)move_runes[3] - '1'}
 		}
-	} else if len(move_string) == 5 {
-		if move_string[2] != 'x' {
+	} else if len(move_runes) == 5 {
+		if move_runes[2] != 'x' {
 			return
 		}
 		move.is_takes = true
-		switch move_string[1] {
+		switch move_runes[1] {
 		case 'a' ..= 'h':
 			move.known_src_column = true
 		case '1' ..= '8':
@@ -138,22 +233,25 @@ parse_half_move_from_pgn :: proc(reader: ^bufio.Reader) -> (move: PGN_Half_Move 
 		case:
 			return
 		}
-		move.dst = Chessboard_location{move_string[3] - 'a', move_string[4] - '1'}
-	} else if len(move_string) == 6{
+		move.dst = Chessboard_location{cast(byte)move_runes[3] - 'a', cast(byte)move_runes[4] - '1'}
+	} else if len(move_runes) == 6{
 		// parse things like gxf8=Q
-		if !((move_string[3] == '8' || move_string[3] == '1') && move_string[4] == '='){
+		if !((move_runes[3] == '8' || move_runes[3] == '1') && move_runes[4] == '='){
 			return
 		}
-		move.src_x = move_string[0] - 'a'
+		move.src_x = cast(byte)move_runes[0] - 'a'
 		move.src_y = 6
 		move.known_src_column = true
-		move.dst = Chessboard_location{move_string[2] - 'a', move_string[3] - '1'}
+		move.dst = Chessboard_location{cast(byte)move_runes[2] - 'a', cast(byte)move_runes[3] - '1'}
+		move.piece_type, success = get_piece_type_from_pgn_character(move_runes[5])
+		assert(success)
+		assert(move.piece_type != .Pawn)
 	}else {
 		panic("This is impossible.")
 	}
-	if len(move_string) > 2 && move.piece_type != .Pawn{
-		err_localized_notation = !s
-	}
+	// if len(move_string) > 2 && move.piece_type != .Pawn{
+	// 	err_localized_notation = !s
+	// }
 	success = true
 	return
 }
@@ -546,6 +644,12 @@ parse_full_game_from_pgn :: proc(reader: ^bufio.Reader, md: ^Metadata_Table = ni
 	pgn_parsed_game_init(&game)
 	second_half_move: bool
 	for {
+
+		// DEBUG:
+		preview, preview_error := (bufio.reader_peek(reader, 15))
+		preview_string := strings.clone(transmute(string)preview)
+		defer delete(preview_string)
+
 		token, token_read_err := parse_pgn_token(reader)
 		if token_read_err == io.Error.Negative_Read{
 			panic("Your pgn file likely uses localized notation(or it is invalid)")
@@ -559,7 +663,7 @@ parse_full_game_from_pgn :: proc(reader: ^bufio.Reader, md: ^Metadata_Table = ni
 		if tag == PGN_Parser_Token_Type.None {
 			desc := "Your pgn database is invalid. This is unsupported!"
 			peek, peek_err := bufio.reader_peek(reader, 20)
-			err_txt := fmt.tprintln(desc, tag, token, "reading error:", peek_err, "\nnext characters:", transmute(string)peek)
+			err_txt := fmt.tprintln(desc, tag, token, "reading error:", peek_err, "\nnext characters:", preview_string)
 			panic(err_txt)
 		}
 		if tag not_in expected {
