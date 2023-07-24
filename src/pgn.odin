@@ -193,7 +193,15 @@ parse_half_move_from_pgn :: proc(reader: ^bufio.Reader) -> (move: PGN_Half_Move 
 				move.src_y = 6
 				move.dst = Chessboard_location{cast(byte)move_runes[1] - 'a', cast(byte)move_runes[1] - '1'}
 				move.piece_type, success = get_piece_type_from_pgn_character(move_runes[3])
-				assert(success, utf8.runes_to_string(move_runes, context.temp_allocator))
+				if !success{
+					message := fmt.tprintln(
+						"Error while parsing move", move_runes, "piece type", move.piece_type, "success", success,
+						"localized notation", err_localized_notation, "move string",
+						utf8.runes_to_string(move_runes, context.temp_allocator)
+					)
+					panic(message)
+				}
+				// assert(success, utf8.runes_to_string(move_runes, context.temp_allocator))
 				assert(move.piece_type != .Pawn)
 			}
 			else if move_runes[1] == 'x' {
