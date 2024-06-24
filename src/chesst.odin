@@ -645,7 +645,7 @@ main :: proc() {
 
 	state.atlas_texture = SDL.CreateTexture(
 		renderer,
-		u32(SDL.PixelFormatEnum.RGBA32),
+		SDL.PixelFormatEnum.RGBA32,
 		.TARGET,
 		mu.DEFAULT_ATLAS_WIDTH,
 		mu.DEFAULT_ATLAS_HEIGHT,
@@ -710,7 +710,7 @@ main :: proc() {
 	defer SDL.DestroyTexture(cb_texture)
 	textures["Chessboard"] = cb_texture
 
-	format: u32
+	format: SDL.PixelFormatEnum
 	access: i32
 	w, h: i32
 	// constructing pieces atlas
@@ -729,7 +729,7 @@ main :: proc() {
 			panic("Couldn't create texture from white pieces surface")
 		}
 		defer SDL.DestroyTexture(white_pieces_atlas)
-		SDL.QueryTexture(white_pieces_atlas, &format, &access, &w, &h)
+		SDL.QueryTexture(white_pieces_atlas, cast(^u32)&format, &access, &w, &h)
 
 		black_pieces_surf := SDL_ttf.RenderText_Blended(chess_font, " otjnwl", {50, 50, 50, 255})
 		if black_pieces_surf == nil {
@@ -743,7 +743,7 @@ main :: proc() {
 		defer SDL.DestroyTexture(black_pieces_atlas)
 		piece_atlas := SDL.CreateTexture(
 			renderer,
-			u32(SDL.PixelFormatEnum.ARGB8888),
+			SDL.PixelFormatEnum.ARGB8888,
 			SDL.TextureAccess.TARGET,
 			w,
 			h * 2,
@@ -773,7 +773,7 @@ main :: proc() {
 	if pieces_overlay_tex == nil {
 		panic("Couldn't create textures from surface")
 	}
-	SDL.QueryTexture(pieces_overlay_tex, &format, &access, &w, &h)
+	SDL.QueryTexture(pieces_overlay_tex, cast(^u32)&format, &access, &w, &h)
 	assert(cb_pieces_overlay_size % state.ui_ctx.piece_resolution == 0)
 	defer SDL.DestroyTexture(pieces_overlay_tex)
 

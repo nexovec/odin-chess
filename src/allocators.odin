@@ -1,6 +1,6 @@
 package main
 
-import "core:runtime"
+import "base:runtime"
 import "core:fmt"
 
 Prefab_Allocator :: struct{
@@ -26,6 +26,8 @@ prefab_allocator_proc: runtime.Allocator_Proc: proc(allocator_data: rawptr, mode
         case .Query_Features:
             err = .Mode_Not_Implemented
         case .Query_Info:
+            err = .Mode_Not_Implemented
+        case .Resize_Non_Zeroed:
             err = .Mode_Not_Implemented
     }
     return
@@ -59,6 +61,7 @@ counting_allocator_proc: runtime.Allocator_Proc: proc(allocator_data: rawptr, mo
             allocator.realloc_count += 1
         case .Query_Features:
         case .Query_Info:
+        case .Resize_Non_Zeroed:
     }
     return allocator.backing.procedure(allocator.backing, mode, size, alignment, old_memory, old_size, location)
 }
@@ -92,6 +95,7 @@ logging_allocator_proc: runtime.Allocator_Proc: proc(allocator_data: rawptr, mod
         case .Resize:
         case .Query_Features:
         case .Query_Info:
+        case .Resize_Non_Zeroed:
     }
     return allocator.backing.procedure(allocator.backing, mode, size, alignment, old_memory, old_size, location)
 }
